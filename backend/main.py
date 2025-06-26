@@ -106,6 +106,10 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         pass
     finally:
         ws_manager.disconnect(session_id)
+        # Cancel the task if it exists (user refreshed/closed browser)
+        task = session_manager.get_task(session_id)
+        if task:
+            task.cancel_event.set()
         session_manager.remove_session(session_id)
 
 async def long_running_task(session_id: str):
