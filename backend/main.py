@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import uuid
+import random
 
 app = FastAPI()
 
@@ -52,8 +53,17 @@ session_manager = SessionManager()
 @app.post("/start-task")
 async def start_task(request: Request, background_tasks: BackgroundTasks):
     session_id, task = session_manager.create_session()
-    background_tasks.add_task(long_running_task, session_id)
-    return {"session_id": session_id}
+    # randomly select a long-running task and stream messages  
+    random_value = random.random()
+    print(f"Random value for session {session_id}: {random_value}")
+    if random_value < 0.5:
+        background_tasks.add_task(long_running_task, session_id)
+        return {"session_id": session_id}
+
+    else: 
+        background_tasks.add_task(simulate_streaming, session_id)
+        return {"session_id": session_id}
+
 
 @app.post("/cancel-task/{session_id}")
 async def cancel_task(session_id: str):
@@ -79,7 +89,13 @@ class WebSocketManager:
     async def send_json(self, session_id: str, data):
         ws = self.active_connections.get(session_id)
         if ws:
-            await ws.send_json(data)
+            try:
+                print(f"Sending WebSocket message to {session_id}: {data}")
+                await ws.send_json(data)
+            except Exception as e:
+                print(f"Error sending WebSocket message to {session_id}: {e}")
+                # Remove disconnected WebSocket
+                self.disconnect(session_id)
 
 ws_manager = WebSocketManager()
 
@@ -114,10 +130,22 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
 async def long_running_task(session_id: str):
     task = session_manager.get_task(session_id)
+    # Give a moment for WebSocket to connect
+    await asyncio.sleep(0.5)
+    print(f"Starting long running task for session {session_id}")
+    
+    # Test stream message right away
+    try:
+        await ws_manager.send_json(session_id, {"type": "stream", "content": "Task started!"})
+        print(f"Sent initial task started message for {session_id}")
+    except Exception as e:
+        print(f"Error sending initial task started message: {e}")
+    
     max_retries = 2
     attempt = 0
     while attempt <= max_retries:
         try:
+            print(f"Starting attempt {attempt + 1} for session {session_id}")
             # Example: ask for email details from user
             await asyncio.sleep(1)
             fields = [
@@ -129,18 +157,66 @@ async def long_running_task(session_id: str):
             if not task.input_request or not task.input_request.values:
                 print(f"Task {session_id} cancelled or no input.")
                 return
+            
+            print(f"Task {session_id} received input: {task.input_request.values}")
+            
+            # Send immediate confirmation that we got the input
+            try:
+                await ws_manager.send_json(session_id, {"type": "stream", "content": "Input received! Starting processing..."})
+                print(f"Sent initial stream message for {session_id}")
+            except Exception as e:
+                print(f"Error sending initial stream message: {e}")
+            
+            # Simulate streaming content to the user
+            print(f"Task {session_id} starting streaming...")
+            try:
+                for i in range(5):
+                    stream_msg = f"Processing email step {i+1}/5... (attempt {attempt+1})"
+                    print(f"About to send stream message {i+1}: {stream_msg}")
+                    await ws_manager.send_json(session_id, {"type": "stream", "content": stream_msg})
+                    print(f"Sent stream message {i+1} for {session_id}")
+                    await asyncio.sleep(0.8)
+                    
+                    # Check for cancellation during streaming
+                    if task.cancel_event.is_set():
+                        print(f"Task {session_id} was cancelled during streaming")
+                        return
+                        
+                print(f"Completed streaming loop for {session_id}")
+            except Exception as e:
+                print(f"Error during streaming: {e}")
+                raise
+            
             # Simulate sending email
             print(f"Task {session_id} sending email: {task.input_request.values}")
+            try:
+                await ws_manager.send_json(session_id, {"type": "stream", "content": "Sending email..."})
+                print(f"Sent 'sending email' message for {session_id}")
+            except Exception as e:
+                print(f"Error sending 'sending email' message: {e}")
             await asyncio.sleep(1)
-            # Simulate possible failure
-            if attempt < max_retries:
+            
+            # Simulate possible failure (but only on first attempt)
+            if attempt == 0:
+                print(f"Task {session_id} simulating failure on attempt {attempt}")
+                try:
+                    await ws_manager.send_json(session_id, {"type": "stream", "content": "Error occurred, will retry..."})
+                    print(f"Sent error message for {session_id}")
+                except Exception as e:
+                    print(f"Error sending error message: {e}")
                 raise Exception("Simulated task failure")
             # Wait for confirmation from user
             await request_confirmation(session_id)
             if not task.confirmed:
                 print(f"Task {session_id} not confirmed by user.")
+                await ws_manager.send_json(session_id, {"type": "stream", "content": "Task cancelled by user."})
                 return
+            
+            # Final processing with streaming
+            await ws_manager.send_json(session_id, {"type": "stream", "content": "Email confirmed! Finalizing..."})
             await asyncio.sleep(1)  # Simulate some processing time
+            await ws_manager.send_json(session_id, {"type": "stream", "content": "Task completed successfully!"})
+            
             # Notify frontend of completion and values
             await ws_manager.send_json(session_id, {"type": "task_completed", "values": task.input_request.values})
             print(f"Task {session_id} completed.")
@@ -162,14 +238,38 @@ async def long_running_task(session_id: str):
                     return
                 print(f"Retrying task {session_id}, attempt {attempt+1}")
 
+
+async def simulate_streaming(session_id: str):
+    await asyncio.sleep(1)  # Simulate some initial processing delay
+    task = session_manager.get_task(session_id)
+    if not task:
+        print(f"No task found for session {session_id}")
+        return
+    try:
+        for i in range(5):
+            stream_msg = f"Simulated streaming message {i}/5 for session {session_id}" 
+            await ws_manager.send_json(session_id, {"type": "stream", "content": stream_msg})
+            await asyncio.sleep(0.8)
+
+        await ws_manager.send_json(session_id, {"type": "task_completed", "content": "Streaming complete."})  
+
+    except Exception as e:
+        print(f"Error during simulated streaming for {session_id}: {e}")
+
 async def request_user_input(session_id: str, fields):
     task = session_manager.get_task(session_id)
+    if not task:
+        print(f"No task found for session {session_id}")
+        return
     task.input_request = UserInputRequest(fields)
+    print(f"Requesting user input for session {session_id}")
     await ws_manager.send_json(session_id, {
         "type": "request_user_input",
         "fields": fields
     })
+    print(f"Waiting for user input for session {session_id}")
     await task.input_request.event.wait()
+    print(f"User input received for session {session_id}: {task.input_request.values}")
 
 async def request_confirmation(session_id: str):
     task = session_manager.get_task(session_id)

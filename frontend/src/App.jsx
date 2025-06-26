@@ -9,12 +9,14 @@ function App() {
   const [inputFields, setInputFields] = useState(null);
   const [inputValues, setInputValues] = useState({});
   const [submitted, setSubmitted] = useState(null);
+  const [streamContent, setStreamContent] = useState([]);
   const abortController = useRef(null);
 
   const startTask = async () => {
     setTaskStatus("running");
     setInputFields(null);
     setInputValues({});
+    setStreamContent([]); // Clear stream content when starting new task
     const controller = new AbortController();
     abortController.current = controller;
     const res = await fetch("http://localhost:8000/start-task", {
@@ -83,6 +85,7 @@ function App() {
   useEffect(() => {
     if (ws) {
       ws.onmessage = (event) => {
+        console.log("WebSocket message received:", event.data);
         const msg = JSON.parse(event.data);
         if (msg.type === "request_confirmation") {
           setShowConfirm(true);
@@ -104,11 +107,34 @@ function App() {
             setRetryAttempt(null);
             setRetryError(msg.error || msg.message || "Unknown error");
           }
+        } else if (msg.type === "stream") {
+          console.log("Received stream message:", msg.content);
+          setStreamContent((prev) => [...prev, msg.content]);
         }
       };
-      ws.onclose = () => setTaskStatus("closed");
+      ws.onclose = () => {
+        console.log("WebSocket closed");
+        setTaskStatus("closed");
+      };
+      ws.onopen = () => {
+        console.log("WebSocket opened");
+      };
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+      };
     }
+    // Clean up on unmount
+    return () => {
+      if (ws) {
+        ws.onmessage = null;
+        ws.onclose = null;
+        ws.onopen = null;
+        ws.onerror = null;
+      }
+    };
   }, [ws]);
+
+
 
   // Retry state
   const [showRetry, setShowRetry] = useState(false);
@@ -121,15 +147,24 @@ function App() {
     if (!value) setTaskStatus("not retried");
   };
 
+  const clearStream = () => {
+    setStreamContent([]);
+  };
+
   return (
     <div style={{ padding: 32 }}>
       <h1>Human-in-the-Loop Task Demo</h1>
-      <button onClick={startTask} disabled={taskStatus === "running"}>
-        Start Task
-      </button>
-      <button onClick={cancelTask} disabled={taskStatus !== "running"}>
-        Cancel Task
-      </button>
+      <div style={{ marginBottom: 16 }}>
+        <button onClick={startTask} disabled={taskStatus === "running"}>
+          Start Task
+        </button>
+        <button onClick={cancelTask} disabled={taskStatus !== "running"} style={{ marginLeft: 8 }}>
+          Cancel Task
+        </button>
+        <button onClick={clearStream} disabled={streamContent.length === 0} style={{ marginLeft: 8 }}>
+          Clear Stream
+        </button>
+      </div>
       <div>Status: {taskStatus}</div>
       {showConfirm && (
         <div style={{ background: "#eee", padding: 16, margin: 16 }}>
@@ -169,6 +204,31 @@ function App() {
           <div>Do you want to retry?</div>
           <button onClick={() => handleRetry(true)}>Retry</button>
           <button onClick={() => handleRetry(false)}>Cancel</button>
+        </div>
+      )}
+      {streamContent.length > 0 && (
+        <div style={{ 
+          background: "#f0f8ff", 
+          border: "2px solid #4a90e2",
+          borderRadius: "8px",
+          padding: 16, 
+          margin: "16px 0",
+          maxHeight: "200px",
+          overflowY: "auto"
+        }}>
+          <div style={{ fontWeight: "bold", marginBottom: 8, color: "#2c5aa0" }}>
+            Streaming content ({streamContent.length} items):
+          </div>
+          <div style={{ fontFamily: "monospace", fontSize: "14px" }}>
+            {streamContent.map((item, idx) => (
+              <div key={idx} style={{ 
+                padding: "4px 0", 
+                borderBottom: idx < streamContent.length - 1 ? "1px solid #ddd" : "none"
+              }}>
+                [{idx + 1}] {item}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
