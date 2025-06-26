@@ -110,33 +110,53 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
 async def long_running_task(session_id: str):
     task = session_manager.get_task(session_id)
-    # Example: ask for email details from user
-    await asyncio.sleep(1)
-    fields = [
-        {"name": "subject", "description": "Subject of the email", "type": "string", "value": None},
-        {"name": "body", "description": "Body of the email", "type": "string", "value": None},
-        {"name": "to_address", "description": "Recipient email address", "type": "string", "value": None},
-    ]
-
-    await request_user_input(session_id, fields)
-    if not task.input_request or not task.input_request.values:
-        print(f"Task {session_id} cancelled or no input.")
-        return
-    # Simulate sending email
-    print(f"Task {session_id} sending email: {task.input_request.values}")
-    await asyncio.sleep(1)
-
-    # Wait for confirmation from user
-    await request_confirmation(session_id)
-    if not task.confirmed:
-        print(f"Task {session_id} not confirmed by user.")
-        return
-
-    await asyncio.sleep(1)  # Simulate some processing time
-
-    # Notify frontend of completion and values
-    await ws_manager.send_json(session_id, {"type": "task_completed", "values": task.input_request.values})
-    print(f"Task {session_id} completed.")
+    max_retries = 2
+    attempt = 0
+    while attempt <= max_retries:
+        try:
+            # Example: ask for email details from user
+            await asyncio.sleep(1)
+            fields = [
+                {"name": "subject", "description": "Subject of the email", "type": "string", "value": None},
+                {"name": "body", "description": "Body of the email", "type": "string", "value": None},
+                {"name": "to_address", "description": "Recipient email address", "type": "string", "value": None},
+            ]
+            await request_user_input(session_id, fields)
+            if not task.input_request or not task.input_request.values:
+                print(f"Task {session_id} cancelled or no input.")
+                return
+            # Simulate sending email
+            print(f"Task {session_id} sending email: {task.input_request.values}")
+            await asyncio.sleep(1)
+            # Simulate possible failure
+            if attempt < max_retries:
+                raise Exception("Simulated task failure")
+            # Wait for confirmation from user
+            await request_confirmation(session_id)
+            if not task.confirmed:
+                print(f"Task {session_id} not confirmed by user.")
+                return
+            await asyncio.sleep(1)  # Simulate some processing time
+            # Notify frontend of completion and values
+            await ws_manager.send_json(session_id, {"type": "task_completed", "values": task.input_request.values})
+            print(f"Task {session_id} completed.")
+            return
+        except Exception as e:
+            print(f"Task {session_id} failed: {e}")
+            attempt += 1
+            if attempt > max_retries:
+                await ws_manager.send_json(session_id, {"type": "task_failed", "error": str(e), "can_retry": False})
+                print(f"Task {session_id} failed after {max_retries+1} attempts.")
+                return
+            else:
+                # Ask frontend if user wants to retry
+                await ws_manager.send_json(session_id, {"type": "task_failed", "error": str(e), "can_retry": True, "attempt": attempt})
+                # Wait for user to confirm retry
+                retry = await wait_for_retry(session_id)
+                if not retry:
+                    print(f"Task {session_id} not retried by user.")
+                    return
+                print(f"Retrying task {session_id}, attempt {attempt+1}")
 
 async def request_user_input(session_id: str, fields):
     task = session_manager.get_task(session_id)
@@ -153,6 +173,14 @@ async def request_confirmation(session_id: str):
     task.confirmed = None
     await ws_manager.send_json(session_id, {"type": "request_confirmation", "message": "Do you want to send the email?"})
     await task.confirm_event.wait()
+
+async def wait_for_retry(session_id: str):
+    task = session_manager.get_task(session_id)
+    task.confirm_event.clear()
+    task.confirmed = None
+    await ws_manager.send_json(session_id, {"type": "request_retry", "message": "Do you want to retry the task?"})
+    await task.confirm_event.wait()
+    return bool(task.confirmed)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
