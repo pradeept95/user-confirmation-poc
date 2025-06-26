@@ -10,6 +10,7 @@ function App() {
   const [inputValues, setInputValues] = useState({});
   const [submitted, setSubmitted] = useState(null);
   const [streamContent, setStreamContent] = useState([]);
+  const [isStateReplaying, setIsStateReplaying] = useState(false);
   const abortController = useRef(null);
 
   const startTask = async () => {
@@ -110,6 +111,18 @@ function App() {
         } else if (msg.type === "stream") {
           console.log("Received stream message:", msg.content);
           setStreamContent((prev) => [...prev, msg.content]);
+        } else if (msg.type === "state_replay_start") {
+          console.log("State replay starting:", msg.message);
+          setIsStateReplaying(true);
+          // Clear current content before replay
+          setStreamContent([]);
+          setInputFields(null);
+          setShowConfirm(false);
+          setShowRetry(false);
+          setSubmitted(null);
+        } else if (msg.type === "state_replay_complete") {
+          console.log("State replay complete:", msg.message);
+          setIsStateReplaying(false);
         }
       };
       ws.onclose = () => {
@@ -165,7 +178,7 @@ function App() {
           Clear Stream
         </button>
       </div>
-      <div>Status: {taskStatus}</div>
+      <div>Status: {taskStatus} {isStateReplaying && "(Replaying state...)"}</div>
       {showConfirm && (
         <div style={{ background: "#eee", padding: 16, margin: 16 }}>
           <div>Server requests confirmation. Continue?</div>
@@ -214,10 +227,12 @@ function App() {
           padding: 16, 
           margin: "16px 0",
           maxHeight: "200px",
-          overflowY: "auto"
+          overflowY: "auto",
+          opacity: isStateReplaying ? 0.7 : 1
         }}>
           <div style={{ fontWeight: "bold", marginBottom: 8, color: "#2c5aa0" }}>
-            Streaming content ({streamContent.length} items):
+            Streaming content ({streamContent.length} items)
+            {isStateReplaying && " - Replaying saved state"}:
           </div>
           <div style={{ fontFamily: "monospace", fontSize: "14px" }}>
             {streamContent.map((item, idx) => (
