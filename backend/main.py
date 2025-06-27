@@ -7,6 +7,7 @@ from config import create_ollama_model
 from agno.agent import Agent
 from agno.agent import RunResponseEvent
 from agno.tools.googlesearch import GoogleSearchTools
+from agno.tools.duckduckgo import DuckDuckGoTools
 
 import random
 from service.websocket_manager import WebSocketManager
@@ -286,10 +287,14 @@ async def simulate_chat_completion(session_id: str):
             description="An agent that performs web searches and retrieves information.",
             instructions=[
                 "You are an expert in web search.",
-                "Use Google Search to find information.",
-                "Provide comprehensive and accurate responses to user queries.",
-            ], 
-            tools=[GoogleSearchTools(requires_confirmation_tools=["google_search"])],
+                "Use web search tools to find information.", 
+                "Always include the reference links in your response.",
+                "If you need more information, ask the user for input.",
+            ],
+            tools=[
+                GoogleSearchTools(requires_confirmation_tools=["google_search"]), 
+                DuckDuckGoTools(requires_confirmation_tools=["duckduckgo_search"]),
+            ],
             tool_call_limit=5,
             show_tool_calls=True,
             markdown=True

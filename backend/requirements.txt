@@ -4,5 +4,8 @@ websockets
 agno
 openai
 ollama
+
+# Tools for web search
 googlesearch-python
+duckduckgo-search
 pycountry
