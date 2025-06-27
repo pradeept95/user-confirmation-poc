@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import "./App.css";
+import MarkdownPreview from '@uiw/react-markdown-preview';
+
 
 function App() {
   const [sessionId, setSessionId] = useState(null);
@@ -338,7 +340,8 @@ function App() {
             fontSize: "14px",
             fontFamily: "system-ui, -apple-system, sans-serif",
             resize: "vertical",
-            outline: "none"
+            outline: "none",
+            boxSizing: "border-box",
           }}
           onFocus={(e) => e.target.style.borderColor = "#007bff"}
           onBlur={(e) => e.target.style.borderColor = "#ced4da"}
@@ -599,7 +602,7 @@ function App() {
             marginBottom: 12, 
             color: "#2E7D32",
             display: "flex",
-            alignItems: "center",
+            alignItems: "start",
             gap: "8px"
           }}>
             <span>🤖 Agent Response</span>
@@ -624,7 +627,7 @@ function App() {
             whiteSpace: "pre-wrap",
             wordBreak: "break-word"
           }}>
-            {agentResponse}
+            <MarkdownPreview source={agentResponse} />
             {isGenerating && (
               <span style={{ 
                 animation: "blink 1s infinite",

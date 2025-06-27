@@ -290,6 +290,8 @@ async def simulate_chat_completion(session_id: str):
                 "Provide comprehensive and accurate responses to user queries.",
             ], 
             tools=[GoogleSearchTools(requires_confirmation_tools=["google_search"])],
+            tool_call_limit=5,
+            show_tool_calls=True,
             markdown=True
         ) 
 
@@ -322,9 +324,7 @@ async def simulate_chat_completion(session_id: str):
                     if task.cancel_event.is_set():
                         print(f"Task {session_id} was cancelled during streaming")
                         return
-                        
-                    # Print the content to console (for debugging)
-                    print(f"Streaming chunk for session {session_id}: {run_response.content}")
+                         
                     chunk_dist = run_response.to_dict()
                     await ws_manager.send_json(session_id, {"type": "generating", "data": chunk_dist}, save_state=True)
 
