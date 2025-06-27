@@ -13,6 +13,22 @@ function App() {
   const [isStateReplaying, setIsStateReplaying] = useState(false);
   const abortController = useRef(null);
 
+  // connect socket on load
+  useEffect(() => {
+    const socket = new WebSocket("ws://localhost:8000/ws/189ed9d9-a16d-4386-9276-4cf912533487");
+    setWs(socket);
+
+    // Clean up on unmount
+    return () => {
+      if (socket) {
+        socket.onmessage = null;
+        socket.onclose = null;
+        socket.onopen = null;
+        socket.onerror = null;
+      }
+    };
+  }, []);
+
   const startTask = async () => {
     setTaskStatus("running");
     setInputFields(null);
@@ -31,8 +47,8 @@ function App() {
     const data = await res.json();
     setSessionId(data.session_id);
     // Open WebSocket for confirmation/cancellation and user input
-    const socket = new WebSocket(`ws://localhost:8000/ws/${data.session_id}`);
-    setWs(socket);
+    // const socket = new WebSocket(`ws://localhost:8000/ws/${data.session_id}`);
+    // setWs(socket);
   };
 
   const cancelTask = async () => {
