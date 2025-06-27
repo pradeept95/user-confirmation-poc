@@ -5,9 +5,9 @@ class SessionManager:
     def __init__(self):
         self.sessions = {}
 
-    def create_session(self):
+    def create_session(self, user_query: str = "Who is the current president of the United States?"):
         session_id = str(uuid.uuid4())
-        task = SessionTask()
+        task = SessionTask(user_query)
         self.sessions[session_id] = task
         return session_id, task
 

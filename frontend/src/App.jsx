@@ -13,6 +13,8 @@ function App() {
   const [agentResponse, setAgentResponse] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isStateReplaying, setIsStateReplaying] = useState(false);
+  const [userQuery, setUserQuery] = useState("");
+  const [currentQuery, setCurrentQuery] = useState(""); // Store the query being processed
   const abortController = useRef(null);
  
 
@@ -32,6 +34,14 @@ function App() {
     setShowConfirm(false);
     setShowRetry(false);
     setSubmitted(null);
+    setCurrentQuery(""); // Clear current query
+    
+    // Validate user query
+    if (!userQuery.trim()) {
+      alert("Please enter a question before starting the task.");
+      setTaskStatus("idle");
+      return;
+    }
     
     const controller = new AbortController();
     abortController.current = controller;
@@ -39,6 +49,12 @@ function App() {
     try {
       const res = await fetch("http://localhost:8000/start-task", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: userQuery.trim()
+        }),
         signal: controller.signal,
       });
       
@@ -49,6 +65,7 @@ function App() {
       
       const data = await res.json();
       setSessionId(data.session_id);
+      setCurrentQuery(data.query || userQuery.trim()); // Store the current query
       
       // Open WebSocket for confirmation/cancellation and user input
       const socket = new WebSocket(`ws://localhost:8000/ws/${data.session_id}`);
@@ -293,9 +310,113 @@ function App() {
   return (
     <div style={{ padding: 32 }}>
       <h1>Human-in-the-Loop Task Demo</h1>
+      
+      {/* User Query Input Section */}
+      <div style={{ 
+        background: "#f8f9fa", 
+        border: "2px solid #dee2e6",
+        borderRadius: "8px",
+        padding: 16, 
+        marginBottom: 24 
+      }}>
+        <div style={{ fontWeight: "bold", marginBottom: 12, color: "#495057" }}>
+          💬 Ask the AI Agent
+        </div>
+        <div style={{ marginBottom: 12, fontSize: "14px", color: "#6c757d" }}>
+          Enter your question or task for the AI agent to work on:
+        </div>
+        <textarea
+          value={userQuery}
+          onChange={(e) => setUserQuery(e.target.value)}
+          placeholder="e.g., Who is the current president of the United States? or Search for information about climate change..."
+          style={{
+            width: "100%",
+            minHeight: "80px",
+            padding: "12px",
+            border: "1px solid #ced4da",
+            borderRadius: "4px",
+            fontSize: "14px",
+            fontFamily: "system-ui, -apple-system, sans-serif",
+            resize: "vertical",
+            outline: "none"
+          }}
+          onFocus={(e) => e.target.style.borderColor = "#007bff"}
+          onBlur={(e) => e.target.style.borderColor = "#ced4da"}
+        />
+        <div style={{ 
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center",
+          marginTop: 8 
+        }}>
+          <div style={{ fontSize: "12px", color: "#6c757d" }}>
+            Try examples: 
+            <button 
+              type="button"
+              onClick={() => setUserQuery("Who is the current president of the United States?")}
+              style={{ 
+                background: "none", 
+                border: "none", 
+                color: "#007bff", 
+                cursor: "pointer",
+                textDecoration: "underline",
+                fontSize: "12px",
+                margin: "0 4px",
+                padding: 0
+              }}
+            >
+              President
+            </button>
+            |
+            <button 
+              type="button"
+              onClick={() => setUserQuery("What are the latest developments in artificial intelligence?")}
+              style={{ 
+                background: "none", 
+                border: "none", 
+                color: "#007bff", 
+                cursor: "pointer",
+                textDecoration: "underline",
+                fontSize: "12px",
+                margin: "0 4px",
+                padding: 0
+              }}
+            >
+              AI News
+            </button>
+            |
+            <button 
+              type="button"
+              onClick={() => setUserQuery("Search for information about renewable energy trends in 2024")}
+              style={{ 
+                background: "none", 
+                border: "none", 
+                color: "#007bff", 
+                cursor: "pointer",
+                textDecoration: "underline",
+                fontSize: "12px",
+                margin: "0 4px",
+                padding: 0
+              }}
+            >
+              Energy
+            </button>
+          </div>
+          <div style={{ fontSize: "12px", color: "#6c757d" }}>
+            {userQuery.length}/500 characters
+          </div>
+        </div>
+      </div>
+
       <div style={{ marginBottom: 16 }}>
-        <button onClick={startTask} disabled={taskStatus === "running" || taskStatus === "starting"}>
-          {taskStatus === "starting" ? "Starting..." : "Start Task"}
+        <button 
+          onClick={startTask} 
+          disabled={taskStatus === "running" || taskStatus === "starting" || !userQuery.trim()}
+          style={{
+            backgroundColor: !userQuery.trim() ? "#6c757d" : (taskStatus === "running" || taskStatus === "starting" ? "#6c757d" : "#007bff")
+          }}
+        >
+          {taskStatus === "starting" ? "Starting..." : "🚀 Start AI Task"}
         </button>
         <button onClick={cancelTask} disabled={taskStatus !== "running"} style={{ marginLeft: 8 }}>
           Cancel Task
@@ -318,6 +439,26 @@ function App() {
           </span>
         )}
       </div>
+      
+      {/* Current Query Display */}
+      {currentQuery && (taskStatus === "running" || taskStatus === "starting" || taskStatus === "completed") && (
+        <div style={{ 
+          background: "#e8f4fd", 
+          border: "1px solid #bee5eb",
+          borderRadius: "6px",
+          padding: 12, 
+          marginBottom: 16,
+          fontSize: "14px"
+        }}>
+          <div style={{ fontWeight: "500", color: "#0c5460", marginBottom: 4 }}>
+            🎯 Current Task:
+          </div>
+          <div style={{ color: "#0c5460", fontStyle: "italic" }}>
+            "{currentQuery}"
+          </div>
+        </div>
+      )}
+      
       {showConfirm && (
         <div style={{ 
           background: "#fff3cd", 

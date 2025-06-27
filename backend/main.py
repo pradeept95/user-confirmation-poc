@@ -10,7 +10,7 @@ from agno.tools.googlesearch import GoogleSearchTools
 
 import random
 from service.websocket_manager import WebSocketManager
-from models.types import UserInputRequest
+from models.types import UserInputRequest, SessionTask, StartTaskRequest
 from service.session_manager import SessionManager
 
 ws_manager = WebSocketManager()
@@ -27,17 +27,23 @@ app.add_middleware(
 )  
 
 @app.post("/start-task")
-async def start_task(request: Request, background_tasks: BackgroundTasks):
-    session_id, task = session_manager.create_session()
-    # randomly select a long-running task and stream messages  
-    random_value = random.random()
-    print(f"Random value for session {session_id}: {random_value}")
+async def start_task(request: StartTaskRequest, background_tasks: BackgroundTasks):
+    # Validate and sanitize the user query
+    user_query = request.query.strip()
+    if not user_query:
+        return JSONResponse(status_code=400, content={"error": "Query cannot be empty"})
+    
+    if len(user_query) > 500:
+        return JSONResponse(status_code=400, content={"error": "Query too long (max 500 characters)"})
+    
+    session_id, task = session_manager.create_session(user_query)
+    print(f"Starting task for session {session_id} with query: {user_query}")
     
     # Don't start the background task immediately
     # Instead, wait for WebSocket connection to be established
     background_tasks.add_task(wait_for_connection_and_start_task, session_id)
     
-    return {"session_id": session_id}
+    return {"session_id": session_id, "query": user_query}
 
 
 @app.post("/cancel-task/{session_id}")
@@ -268,7 +274,11 @@ async def simulate_chat_completion(session_id: str):
             return
 
         # response start 
-        await ws_manager.send_json(session_id, {"type": "task_started", "content": "Simulated chat completion started."}, save_state=True)
+        user_query = task.user_query
+        await ws_manager.send_json(session_id, {
+            "type": "task_started", 
+            "content": f"Starting AI task with query: '{user_query}'"
+        }, save_state=True)
 
         agent = Agent(
             model=create_ollama_model("llama3.2:3b"),
@@ -277,13 +287,14 @@ async def simulate_chat_completion(session_id: str):
             instructions=[
                 "You are an expert in web search.",
                 "Use Google Search to find information.",
+                "Provide comprehensive and accurate responses to user queries.",
             ], 
             tools=[GoogleSearchTools(requires_confirmation_tools=["google_search"])],
             markdown=True
         ) 
 
-        # Initial async run
-        for run_response in agent.run("Who is current president of united states", stream=True):
+        # Initial async run with user's query
+        for run_response in agent.run(user_query, stream=True):
             # Check for cancellation
             if task.cancel_event.is_set(): 
                 await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
@@ -331,7 +342,10 @@ async def simulate_chat_completion(session_id: str):
                         chunk_dist = chunk.to_dict()
                         await ws_manager.send_json(session_id, {"type": "generating", "data": chunk_dist}, save_state=True)
                 
-        await ws_manager.send_json(session_id, {"type": "task_completed", "content": "Simulated chat completion finished."}, save_state=True)
+        await ws_manager.send_json(session_id, {
+            "type": "task_completed", 
+            "content": f"AI task completed for query: '{user_query}'"
+        }, save_state=True)
         
     except Exception as e:
         print(f"Error during simulated chat completion for {session_id}: {e}")
