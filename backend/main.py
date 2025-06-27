@@ -3,6 +3,9 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Background
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
+from config import create_ollama_model
+from agno.agent import Agent
+from agno.tools.googlesearch import GoogleSearchTools
 
 import random
 from service.websocket_manager import WebSocketManager
@@ -72,6 +75,10 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     task = session_manager.get_task(session_id)
     if not task:
         await websocket.close()
+        # create task if it doesn't exist
+        # print(f"No task found for session {session_id}, creating new task.")
+        # session_manager.create_session(session_id)
+        # task = session_manager.get_task(session_id)
         return
     await ws_manager.connect(session_id, websocket)
     try:
@@ -233,11 +240,7 @@ async def simulate_chat_completion(session_id: str):
         print(f"No task found for session {session_id}")
         return
     try:
-
-        from config import create_ollama_model
-        from agno.agent import Agent
-        from agno.tools.googlesearch import GoogleSearchTools
-
+ 
         # response start
         print(f"Starting simulated chat completion for session {session_id}")
         await ws_manager.send_json(session_id, {"type": "stream", "content": "Simulated chat completion started."}, save_state=True)
@@ -250,7 +253,7 @@ async def simulate_chat_completion(session_id: str):
                 "You are an expert in web search.",
                 "Use Google Search to find information.",
             ], 
-            tools=[GoogleSearchTools()],
+            tools=[GoogleSearchTools(requires_confirmation_tools=["google_search"])],
             markdown=True
         ) 
 
@@ -263,6 +266,7 @@ async def simulate_chat_completion(session_id: str):
 
             # Handle paused states (confirmations, user input, etc.)
             if run_response.is_paused:
+                print(f"Task {session_id} is paused. Waiting for user input or confirmation...")
                 # Handle confirmations, user input, or external tool execution
                 await request_confirmation(session_id)
 
@@ -320,6 +324,7 @@ async def wait_for_retry(session_id: str):
     await ws_manager.send_json(session_id, {"type": "request_retry", "message": "Do you want to retry the task?"}, save_state=True)
     await task.confirm_event.wait()
     return bool(task.confirmed)
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

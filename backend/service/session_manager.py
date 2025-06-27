@@ -6,8 +6,7 @@ class SessionManager:
         self.sessions = {}
 
     def create_session(self):
-        # session_id = str(uuid.uuid4())
-        session_id = "189ed9d9-a16d-4386-9276-4cf912533487"
+        session_id = str(uuid.uuid4())
         task = SessionTask()
         self.sessions[session_id] = task
         return session_id, task
