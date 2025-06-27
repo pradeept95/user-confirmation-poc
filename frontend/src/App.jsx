@@ -10,45 +10,56 @@ function App() {
   const [inputValues, setInputValues] = useState({});
   const [submitted, setSubmitted] = useState(null);
   const [streamContent, setStreamContent] = useState([]);
+  const [agentResponse, setAgentResponse] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isStateReplaying, setIsStateReplaying] = useState(false);
   const abortController = useRef(null);
-
-  // connect socket on load
-  // useEffect(() => {
-  //   const socket = new WebSocket("ws://localhost:8000/ws/189ed9d9-a16d-4386-9276-4cf912533487");
-  //   setWs(socket);
-
-  //   // Clean up on unmount
-  //   return () => {
-  //     if (socket) {
-  //       socket.onmessage = null;
-  //       socket.onclose = null;
-  //       socket.onopen = null;
-  //       socket.onerror = null;
-  //     }
-  //   };
-  // }, []);
+ 
 
   const startTask = async () => {
-    setTaskStatus("running");
+    // Clean up existing WebSocket connection if any
+    if (ws) {
+      ws.close();
+      setWs(null);
+    }
+    
+    setTaskStatus("starting");
     setInputFields(null);
     setInputValues({});
     setStreamContent([]); // Clear stream content when starting new task
+    setAgentResponse(""); // Clear agent response
+    setIsGenerating(false);
+    setShowConfirm(false);
+    setShowRetry(false);
+    setSubmitted(null);
+    
     const controller = new AbortController();
     abortController.current = controller;
-    const res = await fetch("http://localhost:8000/start-task", {
-      method: "POST",
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      setTaskStatus("error");
-      return;
+    
+    try {
+      const res = await fetch("http://localhost:8000/start-task", {
+        method: "POST",
+        signal: controller.signal,
+      });
+      
+      if (!res.ok) {
+        setTaskStatus("error");
+        return;
+      }
+      
+      const data = await res.json();
+      setSessionId(data.session_id);
+      
+      // Open WebSocket for confirmation/cancellation and user input
+      const socket = new WebSocket(`ws://localhost:8000/ws/${data.session_id}`);
+      setWs(socket);
+      
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error("Error starting task:", error);
+        setTaskStatus("error");
+      }
     }
-    const data = await res.json();
-    setSessionId(data.session_id);
-    // Open WebSocket for confirmation/cancellation and user input
-    const socket = new WebSocket(`ws://localhost:8000/ws/${data.session_id}`);
-    setWs(socket);
   };
 
   const cancelTask = async () => {
@@ -85,10 +96,11 @@ function App() {
     if (
       taskStatus === "closed" ||
       taskStatus === "cancelled" ||
-      taskStatus === "not confirmed"
+      taskStatus === "task_not_confirmed"
     ) {
       setInputFields(null);
       setShowConfirm(false);
+      setIsGenerating(false);
     }
   }, [taskStatus]);
 
@@ -112,6 +124,31 @@ function App() {
         } else if (msg.type === "task_completed") {
           setTaskStatus("completed");
           setSubmitted(msg.values);
+          setIsGenerating(false);
+        } else if (msg.type === "task_started") {
+          setTaskStatus("running");
+          setIsGenerating(true);
+          if (msg.content) {
+            setStreamContent((prev) => [...prev, msg.content]);
+          }
+        } else if (msg.type === "generating") {
+          setIsGenerating(true);
+          // Handle agent response streaming
+          if (msg.data && msg.data.content) {
+            setAgentResponse((prev) => prev + msg.data.content);
+          }
+        } else if (msg.type === "task_cancelled") {
+          setTaskStatus("cancelled");
+          setIsGenerating(false);
+          if (msg.content) {
+            setStreamContent((prev) => [...prev, msg.content]);
+          }
+        } else if (msg.type === "task_not_confirmed") {
+          setTaskStatus("not_confirmed");
+          setIsGenerating(false);
+          if (msg.content) {
+            setStreamContent((prev) => [...prev, msg.content]);
+          }
         } else if (msg.type === "task_failed" || msg.type === "request_retry") {
           setTaskStatus("failed");
           setSubmitted(null);
@@ -125,14 +162,21 @@ function App() {
             setRetryError(msg.error || msg.message || "Unknown error");
           }
         } else if (msg.type === "stream") {
-          console.log("Received stream message:", msg.content);
-          setStreamContent((prev) => [...prev, msg.content]);
+          console.log("Received stream message:", msg);
+          // Handle both old format (content) and new format (data)
+          if (msg.content) {
+            setStreamContent((prev) => [...prev, msg.content]);
+          } else if (msg.data && msg.data.content) {
+            setStreamContent((prev) => [...prev, msg.data.content]);
+          }
         } else if (msg.type === "initial_state") {
           console.log("Received initial state:", msg.message, `(${msg.state_count} messages)`);
           setIsStateReplaying(msg.state_count > 0);
           
           // Clear current content before applying state
           setStreamContent([]);
+          setAgentResponse("");
+          setIsGenerating(false);
           setInputFields(null);
           setShowConfirm(false);
           setShowRetry(false);
@@ -143,7 +187,12 @@ function App() {
             msg.state_messages.forEach((stateMsg) => {
               // Process each saved state message
               if (stateMsg.type === "stream") {
-                setStreamContent((prev) => [...prev, stateMsg.content]);
+                // Handle both old format (content) and new format (data)
+                if (stateMsg.content) {
+                  setStreamContent((prev) => [...prev, stateMsg.content]);
+                } else if (stateMsg.data && stateMsg.data.content) {
+                  setStreamContent((prev) => [...prev, stateMsg.data.content]);
+                }
               } else if (stateMsg.type === "request_user_input") {
                 setInputFields(stateMsg.fields);
                 setInputValues({});
@@ -152,6 +201,30 @@ function App() {
               } else if (stateMsg.type === "task_completed") {
                 setTaskStatus("completed");
                 setSubmitted(stateMsg.values);
+                setIsGenerating(false);
+              } else if (stateMsg.type === "task_started") {
+                setTaskStatus("running");
+                setIsGenerating(true);
+                if (stateMsg.content) {
+                  setStreamContent((prev) => [...prev, stateMsg.content]);
+                }
+              } else if (stateMsg.type === "generating") {
+                setIsGenerating(true);
+                if (stateMsg.data && stateMsg.data.content) {
+                  setAgentResponse((prev) => prev + stateMsg.data.content);
+                }
+              } else if (stateMsg.type === "task_cancelled") {
+                setTaskStatus("cancelled");
+                setIsGenerating(false);
+                if (stateMsg.content) {
+                  setStreamContent((prev) => [...prev, stateMsg.content]);
+                }
+              } else if (stateMsg.type === "task_not_confirmed") {
+                setTaskStatus("not_confirmed");
+                setIsGenerating(false);
+                if (stateMsg.content) {
+                  setStreamContent((prev) => [...prev, stateMsg.content]);
+                }
               } else if (stateMsg.type === "task_failed" || stateMsg.type === "request_retry") {
                 setTaskStatus("failed");
                 if (stateMsg.can_retry !== false) {
@@ -165,17 +238,24 @@ function App() {
           
           // Clear replay indicator after a brief moment
           setTimeout(() => setIsStateReplaying(false), 1000);
+        } else if (msg.type === "connection_ready") {
+          console.log("Connection ready received for session:", msg.session_id);
+          // Send acknowledgment that client is ready
+          ws.send(JSON.stringify({ type: "connection_acknowledged" }));
         }
       };
       ws.onclose = () => {
         console.log("WebSocket closed");
         setTaskStatus("closed");
+        setWs(null); // Clear WebSocket reference
       };
       ws.onopen = () => {
         console.log("WebSocket opened");
+        setTaskStatus("running"); // Update status when WebSocket opens
       };
       ws.onerror = (error) => {
         console.error("WebSocket error:", error);
+        setTaskStatus("error");
       };
     }
     // Clean up on unmount
@@ -206,12 +286,16 @@ function App() {
     setStreamContent([]);
   };
 
+  const clearAgentResponse = () => {
+    setAgentResponse("");
+  };
+
   return (
     <div style={{ padding: 32 }}>
       <h1>Human-in-the-Loop Task Demo</h1>
       <div style={{ marginBottom: 16 }}>
-        <button onClick={startTask} disabled={taskStatus === "running"}>
-          Start Task
+        <button onClick={startTask} disabled={taskStatus === "running" || taskStatus === "starting"}>
+          {taskStatus === "starting" ? "Starting..." : "Start Task"}
         </button>
         <button onClick={cancelTask} disabled={taskStatus !== "running"} style={{ marginLeft: 8 }}>
           Cancel Task
@@ -219,29 +303,99 @@ function App() {
         <button onClick={clearStream} disabled={streamContent.length === 0} style={{ marginLeft: 8 }}>
           Clear Stream
         </button>
+        <button onClick={clearAgentResponse} disabled={agentResponse.length === 0} style={{ marginLeft: 8 }}>
+          Clear Agent Response
+        </button>
       </div>
-      <div>Status: {taskStatus} {isStateReplaying && "(Restoring session state...)"}</div>
+      <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: "16px" }}>
+        Status: 
+        <span className={`status-indicator status-${taskStatus.replace(' ', '_')}`}>
+          {taskStatus}
+        </span>
+        {isStateReplaying && (
+          <span style={{ fontSize: "12px", color: "#666", fontStyle: "italic" }}>
+            (Restoring session state...)
+          </span>
+        )}
+      </div>
       {showConfirm && (
-        <div style={{ background: "#eee", padding: 16, margin: 16 }}>
-          <div>Server requests confirmation. Continue?</div>
-          <button onClick={() => handleConfirm(true)}>Yes</button>
-          <button onClick={() => handleConfirm(false)}>No</button>
+        <div style={{ 
+          background: "#fff3cd", 
+          border: "2px solid #ffc107",
+          borderRadius: "8px",
+          padding: 16, 
+          margin: 16 
+        }}>
+          <div style={{ fontWeight: "bold", marginBottom: 8, color: "#856404" }}>
+            🤔 Agent Confirmation Required
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            The agent is requesting permission to proceed with an action. Do you want to continue?
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button 
+              onClick={() => handleConfirm(true)}
+              style={{ backgroundColor: "#28a745" }}
+            >
+              ✅ Yes, Continue
+            </button>
+            <button 
+              onClick={() => handleConfirm(false)}
+              style={{ backgroundColor: "#dc3545" }}
+            >
+              ❌ No, Cancel
+            </button>
+          </div>
         </div>
       )}
       {inputFields && (
-        <div style={{ background: "#eef", padding: 16, margin: 16 }}>
-          <div>Server requests input:</div>
+        <div style={{ 
+          background: "#e3f2fd", 
+          border: "2px solid #2196F3",
+          borderRadius: "8px",
+          padding: 16, 
+          margin: 16 
+        }}>
+          <div style={{ fontWeight: "bold", marginBottom: 12, color: "#1565C0" }}>
+            📝 Agent Requires Input
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            Please provide the following information:
+          </div>
           {inputFields.map((field) => (
-            <div key={field.name} style={{ margin: 8 }}>
-              <label>{field.description}: </label>
+            <div key={field.name} style={{ margin: "12px 0" }}>
+              <label style={{ 
+                display: "block", 
+                marginBottom: "4px", 
+                fontWeight: "500",
+                color: "#1565C0"
+              }}>
+                {field.description}:
+              </label>
               <input
                 type="text"
                 value={inputValues[field.name] || ""}
                 onChange={(e) => handleInputChange(e, field.name)}
+                style={{
+                  width: "100%",
+                  padding: "8px 12px",
+                  border: "1px solid #ccc",
+                  borderRadius: "4px",
+                  fontSize: "14px"
+                }}
+                placeholder={`Enter ${field.description.toLowerCase()}...`}
               />
             </div>
           ))}
-          <button onClick={handleInputSubmit}>Submit</button>
+          <button 
+            onClick={handleInputSubmit}
+            style={{ 
+              backgroundColor: "#2196F3",
+              marginTop: "12px"
+            }}
+          >
+            📤 Submit Information
+          </button>
         </div>
       )}
       {submitted && (
@@ -285,6 +439,60 @@ function App() {
                 [{idx + 1}] {item}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+      {agentResponse && (
+        <div style={{ 
+          background: "#f8fff8", 
+          border: "2px solid #4CAF50",
+          borderRadius: "8px",
+          padding: 16, 
+          margin: "16px 0",
+          maxHeight: "400px",
+          overflowY: "auto",
+          opacity: isStateReplaying ? 0.7 : 1
+        }}>
+          <div style={{ 
+            fontWeight: "bold", 
+            marginBottom: 12, 
+            color: "#2E7D32",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}>
+            <span>🤖 Agent Response</span>
+            {isGenerating && (
+              <span style={{ 
+                fontSize: "12px", 
+                background: "#4CAF50", 
+                color: "white", 
+                padding: "2px 8px", 
+                borderRadius: "12px",
+                animation: "pulse 1.5s infinite"
+              }}>
+                Generating...
+              </span>
+            )}
+            {isStateReplaying && <span style={{ fontSize: "12px", color: "#666" }}>- Restoring session state</span>}
+          </div>
+          <div style={{ 
+            fontFamily: "system-ui, -apple-system, sans-serif", 
+            fontSize: "14px",
+            lineHeight: "1.6",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word"
+          }}>
+            {agentResponse}
+            {isGenerating && (
+              <span style={{ 
+                animation: "blink 1s infinite",
+                fontSize: "18px",
+                marginLeft: "2px"
+              }}>
+                |
+              </span>
+            )}
           </div>
         </div>
       )}

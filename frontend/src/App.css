@@ -40,3 +40,54 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Animation for generating indicator */
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Better button styling */
+button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+button:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+button:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Status indicator styling */
+.status-indicator {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.status-idle { background-color: #e9ecef; color: #495057; }
+.status-starting { background-color: #fff3cd; color: #856404; }
+.status-running { background-color: #d4edda; color: #155724; }
+.status-completed { background-color: #d1ecf1; color: #0c5460; }
+.status-cancelled { background-color: #f8d7da; color: #721c24; }
+.status-error { background-color: #f8d7da; color: #721c24; }
+.status-not_confirmed { background-color: #ffeaa7; color: #6c5ce7; }

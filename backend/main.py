@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from config import create_ollama_model
 from agno.agent import Agent
+from agno.agent import RunResponseEvent
 from agno.tools.googlesearch import GoogleSearchTools
 
 import random
@@ -31,15 +32,11 @@ async def start_task(request: Request, background_tasks: BackgroundTasks):
     # randomly select a long-running task and stream messages  
     random_value = random.random()
     print(f"Random value for session {session_id}: {random_value}")
-    background_tasks.add_task(simulate_chat_completion, session_id)
-    # if random_value < 0.5:
-    #     background_tasks.add_task(long_running_task, session_id)
-    #     return {"session_id": session_id}
-
-    # else: 
-    #     background_tasks.add_task(simulate_streaming, session_id)
-    #     return {"session_id": session_id}
-
+    
+    # Don't start the background task immediately
+    # Instead, wait for WebSocket connection to be established
+    background_tasks.add_task(wait_for_connection_and_start_task, session_id)
+    
     return {"session_id": session_id}
 
 
@@ -75,12 +72,16 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     task = session_manager.get_task(session_id)
     if not task:
         await websocket.close()
-        # create task if it doesn't exist
-        # print(f"No task found for session {session_id}, creating new task.")
-        # session_manager.create_session(session_id)
-        # task = session_manager.get_task(session_id)
         return
+        
+    # Connect to WebSocket
     await ws_manager.connect(session_id, websocket)
+    
+    # Signal that WebSocket is ready
+    task.connection_count += 1
+    task.websocket_ready.set()
+    print(f"WebSocket connected for session {session_id}, signaling ready")
+    
     try:
         while True:
             data = await websocket.receive_json()
@@ -93,17 +94,29 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 if task.input_request:
                     task.input_request.values = data.get("values")
                     task.input_request.event.set()
+            elif data.get("type") == "connection_acknowledged":
+                # Client has acknowledged the connection is ready
+                print(f"Client acknowledged connection for session {session_id}")
+                
     except WebSocketDisconnect:
-        pass
+        print(f"WebSocket disconnected for session {session_id}")
+    except Exception as e:
+        print(f"WebSocket error for session {session_id}: {e}")
     finally:
+        # Only clean up if this is the last connection
         ws_manager.disconnect(session_id)
-        # Cancel the task if it exists (user refreshed/closed browser)
-        task = session_manager.get_task(session_id)
-        if task:
+        task.connection_count -= 1
+        
+        # Only cancel task and cleanup if no other connections
+        if task.connection_count <= 0:
+            print(f"No more connections for session {session_id}, cleaning up")
             task.cancel_event.set()
-        # Clear session state and remove session
-        ws_manager.clear_session_state(session_id)
-        session_manager.remove_session(session_id)
+            ws_manager.clear_session_state(session_id)
+            session_manager.remove_session(session_id)
+        else:
+            print(f"Still have {task.connection_count} connections for session {session_id}")
+            # Reset websocket_ready for next connection
+            task.websocket_ready.clear()
 
 
 async def long_running_task(session_id: str):
@@ -234,16 +247,28 @@ async def simulate_streaming(session_id: str):
         print(f"Error during simulated streaming for {session_id}: {e}")
 
 async def simulate_chat_completion(session_id: str): 
-    asyncio.sleep(2)  # Give a moment for WebSocket to connect
     task = session_manager.get_task(session_id)
     if not task:
         print(f"No task found for session {session_id}")
         return
+        
+    # Wait for WebSocket to be ready if not called from wait_for_connection_and_start_task
+    if not task.task_started.is_set():
+        try:
+            await asyncio.wait_for(task.websocket_ready.wait(), timeout=10.0)
+            await asyncio.sleep(0.5)  # Small delay for client readiness
+        except asyncio.TimeoutError:
+            print(f"Timeout waiting for WebSocket for session {session_id}")
+            return
+    
     try:
- 
-        # response start
-        print(f"Starting simulated chat completion for session {session_id}")
-        await ws_manager.send_json(session_id, {"type": "stream", "content": "Simulated chat completion started."}, save_state=True)
+        # Check if task was cancelled before starting
+        if task.cancel_event.is_set():
+            print(f"Task {session_id} was cancelled before starting")
+            return
+
+        # response start 
+        await ws_manager.send_json(session_id, {"type": "task_started", "content": "Simulated chat completion started."}, save_state=True)
 
         agent = Agent(
             model=create_ollama_model("llama3.2:3b"),
@@ -257,12 +282,12 @@ async def simulate_chat_completion(session_id: str):
             markdown=True
         ) 
 
-        # agent.print_response(
-        #     "Who is the current president of the United States?",
-        # )
-
         # Initial async run
         for run_response in agent.run("Who is current president of united states", stream=True):
+            # Check for cancellation
+            if task.cancel_event.is_set(): 
+                await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+                return
 
             # Handle paused states (confirmations, user input, etc.)
             if run_response.is_paused:
@@ -272,50 +297,111 @@ async def simulate_chat_completion(session_id: str):
 
                 if not task.confirmed:
                     print(f"Task {session_id} not confirmed by user.")
-                    await ws_manager.send_json(session_id, {"type": "stream", "content": "Task cancelled by user."}, save_state=True)
+                    await ws_manager.send_json(session_id, {"type": "task_not_confirmed", "content": "Task not confirmed by user."}, save_state=True)
                     return
-                
-                else :
+                else:
                     print(f"Task {session_id} confirmed by user. Continuing run...")
                     run_response = agent.continue_run(stream=True)
 
+            # check if run_response is RunResponseEvent event type
+            if  isinstance(run_response, RunResponseEvent):
+                print(f"Received RunResponseEvent for session {session_id}")
+                if run_response.content is not None:
+                    # Check for cancellation before sending
+                    if task.cancel_event.is_set():
+                        print(f"Task {session_id} was cancelled during streaming")
+                        return
+                        
+                    # Print the content to console (for debugging)
+                    print(f"Streaming chunk for session {session_id}: {run_response.content}")
+                    chunk_dist = run_response.to_dict()
+                    await ws_manager.send_json(session_id, {"type": "generating", "data": chunk_dist}, save_state=True)
 
-            # Stream the response
-            if run_response.content is not None:
-                # Print the content to console (for debugging)
-                print(f"Streaming chunk for session {session_id}: {run_response.content}")
-                chunk_dist = run_response.to_dict()
-                await ws_manager.send_json(session_id, {"type": "stream", "data": chunk_dist}, save_state=True)
-           
-        # async for chunk in run_response:
-        #     chunk_dist = await chunk.to_dict()
-        #     await ws_manager.send_json(session_id, {"type": "stream", "data": chunk._to}, save_state=True)
- 
+            else: 
+                # Stream the response
+                for chunk in run_response:
+                    if chunk.content is not None:
+                        # Check for cancellation before sending
+                        if task.cancel_event.is_set():
+                            print(f"Task {session_id} was cancelled during streaming")
+                            return
+                            
+                        # Print the content to console (for debugging)
+                        print(f"Streaming chunk for session {session_id}: {chunk.content}")
+                        chunk_dist = chunk.to_dict()
+                        await ws_manager.send_json(session_id, {"type": "generating", "data": chunk_dist}, save_state=True)
+                
         await ws_manager.send_json(session_id, {"type": "task_completed", "content": "Simulated chat completion finished."}, save_state=True)
+        
     except Exception as e:
         print(f"Error during simulated chat completion for {session_id}: {e}")
+        await ws_manager.send_json(session_id, {"type": "task_failed", "error": str(e)}, save_state=True)
 
 async def request_user_input(session_id: str, fields):
     task = session_manager.get_task(session_id)
     if not task:
         print(f"No task found for session {session_id}")
-        return
+        return False
+        
+    # Check if WebSocket is connected
+    if not ws_manager.is_connected(session_id):
+        print(f"No WebSocket connection for session {session_id}, cannot request user input")
+        return False
+        
     task.input_request = UserInputRequest(fields)
     print(f"Requesting user input for session {session_id}")
+    
     await ws_manager.send_json(session_id, {
         "type": "request_user_input",
         "fields": fields
     }, save_state=True)
+    
     print(f"Waiting for user input for session {session_id}")
-    await task.input_request.event.wait()
-    print(f"User input received for session {session_id}: {task.input_request.values}")
+    
+    try:
+        # Wait for user input with timeout
+        await asyncio.wait_for(task.input_request.event.wait(), timeout=60.0)
+        print(f"User input received for session {session_id}: {task.input_request.values}")
+        return True
+    except asyncio.TimeoutError:
+        print(f"User input timeout for session {session_id}")
+        await ws_manager.send_json(session_id, {
+            "type": "stream", 
+            "content": "Input timeout - task cancelled."
+        }, save_state=True)
+        return False
 
 async def request_confirmation(session_id: str):
     task = session_manager.get_task(session_id)
+    if not task:
+        print(f"No task found for session {session_id}")
+        return False
+        
+    # Reset confirmation state
     task.confirm_event.clear()
     task.confirmed = None
-    await ws_manager.send_json(session_id, {"type": "request_confirmation", "message": "Do you want to send the email?"}, save_state=True)
-    await task.confirm_event.wait()
+    
+    # Check if WebSocket is connected before sending
+    if not ws_manager.is_connected(session_id):
+        print(f"No WebSocket connection for session {session_id}, cannot request confirmation")
+        return False
+    
+    await ws_manager.send_json(session_id, {
+        "type": "request_confirmation", 
+        "message": "Do you want to proceed with this action?"
+    }, save_state=True)
+    
+    try:
+        # Wait for confirmation with timeout
+        await asyncio.wait_for(task.confirm_event.wait(), timeout=30.0)
+        return task.confirmed is True
+    except asyncio.TimeoutError:
+        print(f"Confirmation timeout for session {session_id}")
+        await ws_manager.send_json(session_id, {
+            "type": "stream", 
+            "content": "Confirmation timeout - task cancelled."
+        }, save_state=True)
+        return False
 
 async def wait_for_retry(session_id: str):
     task = session_manager.get_task(session_id)
@@ -324,6 +410,37 @@ async def wait_for_retry(session_id: str):
     await ws_manager.send_json(session_id, {"type": "request_retry", "message": "Do you want to retry the task?"}, save_state=True)
     await task.confirm_event.wait()
     return bool(task.confirmed)
+
+async def wait_for_connection_and_start_task(session_id: str):
+    """Wait for WebSocket connection to be established before starting the actual task."""
+    task = session_manager.get_task(session_id)
+    if not task:
+        print(f"No task found for session {session_id}")
+        return
+    
+    print(f"Waiting for WebSocket connection for session {session_id}")
+    
+    # Wait for WebSocket connection (with timeout)
+    try:
+        await asyncio.wait_for(task.websocket_ready.wait(), timeout=30.0)
+        print(f"WebSocket ready for session {session_id}, starting task")
+        
+        # Additional small delay to ensure client is fully ready
+        await asyncio.sleep(0.5)
+        
+        # Mark task as started
+        task.task_started.set()
+        
+        # Start the actual task
+        await simulate_chat_completion(session_id)
+        
+    except asyncio.TimeoutError:
+        print(f"Timeout waiting for WebSocket connection for session {session_id}")
+        # Clean up session
+        session_manager.remove_session(session_id)
+        ws_manager.clear_session_state(session_id)
+    except Exception as e:
+        print(f"Error waiting for connection or starting task for session {session_id}: {e}")
 
 
 if __name__ == "__main__":
