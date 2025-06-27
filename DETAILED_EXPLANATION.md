@@ -724,16 +724,30 @@ class WebSocketManager:
 
 **How it works**:
 1. When a new WebSocket connection is established for an existing session
-2. The system automatically sends all previously saved state messages
-3. Client receives complete session history and can reconstruct UI state
+2. The system immediately sends all previously saved state in a single message
+3. Client receives complete session history and reconstructs UI state instantly
 
-**Message Flow**:
+**Message Format**:
 ```javascript
-// Client receives during reconnection:
-{ "type": "state_replay_start", "message": "Replaying 15 state messages" }
-// ... all previous state messages replayed ...
-{ "type": "state_replay_complete", "message": "State replay finished" }
+// Client receives immediately after connection:
+{
+    "type": "initial_state",
+    "message": "Restoring session with 15 saved messages",
+    "state_messages": [
+        // Array of all previous state messages
+        {"type": "stream", "content": "Task started!"},
+        {"type": "request_user_input", "fields": [...]},
+        // ... all other saved messages
+    ],
+    "state_count": 15
+}
 ```
+
+**Benefits**:
+- **Single Request**: All state sent in one message, not multiple
+- **Immediate Restoration**: No delay between connection and state recovery
+- **Efficient**: Reduces WebSocket message overhead
+- **Atomic**: All state applied at once for consistent UI
 
 #### 3. Memory Management
 
@@ -755,19 +769,31 @@ def clear_session_state(self, session_id: str):
 The React frontend handles state replay gracefully:
 
 ```javascript
-// State management during replay
+// State management during initial connection
 const [isStateReplaying, setIsStateReplaying] = useState(false);
 
-// Handle replay messages
-case "state_replay_start":
-    setIsStateReplaying(true);
-    // Clear current state before replay
+// Handle initial state message
+case "initial_state":
+    console.log("Received initial state:", msg.message);
+    setIsStateReplaying(msg.state_count > 0);
+    
+    // Clear current state
     setStreamContent([]);
     setInputFields(null);
-    break;
-
-case "state_replay_complete":
-    setIsStateReplaying(false);
+    
+    // Apply all state messages at once
+    if (msg.state_messages && msg.state_messages.length > 0) {
+        msg.state_messages.forEach((stateMsg) => {
+            // Process each saved state message
+            if (stateMsg.type === "stream") {
+                setStreamContent(prev => [...prev, stateMsg.content]);
+            }
+            // ... handle other message types
+        });
+    }
+    
+    // Clear indicator after brief moment
+    setTimeout(() => setIsStateReplaying(false), 1000);
     break;
 ```
 

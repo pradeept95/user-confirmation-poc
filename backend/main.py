@@ -97,11 +97,35 @@ class WebSocketManager:
         self.session_states = {}  # Store all state messages per session
 
     async def connect(self, session_id: str, websocket: WebSocket):
+        # Prepare state data before accepting connection
+        state_data = None
+        if session_id in self.session_states:
+            state_data = {
+                "type": "initial_state",
+                "message": f"Restoring session with {len(self.session_states[session_id])} saved messages",
+                "state_messages": [entry["data"] for entry in self.session_states[session_id]],
+                "state_count": len(self.session_states[session_id])
+            }
+            print(f"Preparing initial state for {session_id} with {len(self.session_states[session_id])} messages")
+        else:
+            state_data = {
+                "type": "initial_state", 
+                "message": "New session - no saved state",
+                "state_messages": [],
+                "state_count": 0
+            }
+            print(f"No saved state found for session {session_id}")
+        
         await websocket.accept()
         self.active_connections[session_id] = websocket
         
-        # Send full state to newly connected client
-        await self._send_full_state(session_id, websocket)
+        # Send initial state immediately after connection
+        try:
+            await websocket.send_json(state_data)
+            print(f"Sent initial state to {session_id}")
+        except Exception as e:
+            print(f"Error sending initial state to {session_id}: {e}")
+            self.disconnect(session_id)
 
     def disconnect(self, session_id: str):
         if session_id in self.active_connections:
@@ -146,33 +170,6 @@ class WebSocketManager:
         # Keep only last 100 state messages to prevent memory issues
         if len(self.session_states[session_id]) > 100:
             self.session_states[session_id] = self.session_states[session_id][-100:]
-
-    async def _send_full_state(self, session_id: str, websocket: WebSocket):
-        """Send full session state to a newly connected client."""
-        if session_id in self.session_states:
-            print(f"Sending full state replay to {session_id} ({len(self.session_states[session_id])} messages)")
-            
-            # Send state replay indicator
-            try:
-                await websocket.send_json({
-                    "type": "state_replay_start",
-                    "message": f"Replaying {len(self.session_states[session_id])} state messages"
-                })
-                
-                # Send all saved state messages
-                for state_entry in self.session_states[session_id]:
-                    await websocket.send_json(state_entry["data"])
-                
-                # Send state replay complete indicator
-                await websocket.send_json({
-                    "type": "state_replay_complete",
-                    "message": "State replay finished"
-                })
-                
-            except Exception as e:
-                print(f"Error sending full state to {session_id}: {e}")
-        else:
-            print(f"No saved state found for session {session_id}")
 
     def clear_session_state(self, session_id: str):
         """Clear saved state for a session."""
@@ -328,8 +325,7 @@ async def long_running_task(session_id: str):
                 print(f"Retrying task {session_id}, attempt {attempt+1}")
 
 
-async def simulate_streaming(session_id: str):
-    await asyncio.sleep(1)  # Simulate some initial processing delay
+async def simulate_streaming(session_id: str): 
     task = session_manager.get_task(session_id)
     if not task:
         print(f"No task found for session {session_id}")

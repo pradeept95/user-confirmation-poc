@@ -111,18 +111,44 @@ function App() {
         } else if (msg.type === "stream") {
           console.log("Received stream message:", msg.content);
           setStreamContent((prev) => [...prev, msg.content]);
-        } else if (msg.type === "state_replay_start") {
-          console.log("State replay starting:", msg.message);
-          setIsStateReplaying(true);
-          // Clear current content before replay
+        } else if (msg.type === "initial_state") {
+          console.log("Received initial state:", msg.message, `(${msg.state_count} messages)`);
+          setIsStateReplaying(msg.state_count > 0);
+          
+          // Clear current content before applying state
           setStreamContent([]);
           setInputFields(null);
           setShowConfirm(false);
           setShowRetry(false);
           setSubmitted(null);
-        } else if (msg.type === "state_replay_complete") {
-          console.log("State replay complete:", msg.message);
-          setIsStateReplaying(false);
+          
+          // Apply all state messages at once
+          if (msg.state_messages && msg.state_messages.length > 0) {
+            msg.state_messages.forEach((stateMsg) => {
+              // Process each saved state message
+              if (stateMsg.type === "stream") {
+                setStreamContent((prev) => [...prev, stateMsg.content]);
+              } else if (stateMsg.type === "request_user_input") {
+                setInputFields(stateMsg.fields);
+                setInputValues({});
+              } else if (stateMsg.type === "request_confirmation") {
+                setShowConfirm(true);
+              } else if (stateMsg.type === "task_completed") {
+                setTaskStatus("completed");
+                setSubmitted(stateMsg.values);
+              } else if (stateMsg.type === "task_failed" || stateMsg.type === "request_retry") {
+                setTaskStatus("failed");
+                if (stateMsg.can_retry !== false) {
+                  setShowRetry(true);
+                  setRetryAttempt(stateMsg.attempt || 1);
+                  setRetryError(stateMsg.error || stateMsg.message || "Unknown error");
+                }
+              }
+            });
+          }
+          
+          // Clear replay indicator after a brief moment
+          setTimeout(() => setIsStateReplaying(false), 1000);
         }
       };
       ws.onclose = () => {
@@ -178,7 +204,7 @@ function App() {
           Clear Stream
         </button>
       </div>
-      <div>Status: {taskStatus} {isStateReplaying && "(Replaying state...)"}</div>
+      <div>Status: {taskStatus} {isStateReplaying && "(Restoring session state...)"}</div>
       {showConfirm && (
         <div style={{ background: "#eee", padding: 16, margin: 16 }}>
           <div>Server requests confirmation. Continue?</div>
@@ -232,7 +258,7 @@ function App() {
         }}>
           <div style={{ fontWeight: "bold", marginBottom: 8, color: "#2c5aa0" }}>
             Streaming content ({streamContent.length} items)
-            {isStateReplaying && " - Replaying saved state"}:
+            {isStateReplaying && " - Restoring session state"}:
           </div>
           <div style={{ fontFamily: "monospace", fontSize: "14px" }}>
             {streamContent.map((item, idx) => (
