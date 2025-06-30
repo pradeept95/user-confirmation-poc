@@ -286,8 +286,7 @@ async def simulate_chat_completion(session_id: str):
             name="Web Search Agent",
             description="An agent that performs web searches and retrieves information.",
             instructions=[
-                "You are an expert in web search.",
-                "Use web search tools to find information.", 
+                "Provide accurate and relevant information based on the user's query.", 
                 "Always include the reference links in your response.",
                 "If you need more information, ask the user for input.",
             ],
@@ -295,6 +294,7 @@ async def simulate_chat_completion(session_id: str):
                 GoogleSearchTools(requires_confirmation_tools=["google_search"]), 
                 DuckDuckGoTools(requires_confirmation_tools=["duckduckgo_search"]),
             ],
+            add_datetime_to_instructions=True, 
             tool_call_limit=5,
             show_tool_calls=True,
             markdown=True
