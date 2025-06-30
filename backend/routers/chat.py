@@ -94,7 +94,7 @@ async def chat_completion(session_id: str, user_query: str):
                     )
                     # Handle confirmations, user input, or external tool execution
                     confirmation_message = (
-                        f"Tool {tool.tool_name} requires confirmation. Do you want to proceed?"
+                        f"Agent is trying to access {tool.tool_name} with query {tool.tool_args}. Do you want to proceed?"
                     )
                     await request_confirmation(session_id, confirmation_message)
 

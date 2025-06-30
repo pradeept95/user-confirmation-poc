@@ -160,7 +160,7 @@ function App() {
           if (msg.data && msg.data.content && msg.data.event === "RunResponseContent") {
             setAgentResponse((prev) => prev + msg.data.content);
           }else if (msg.data && msg.data.content && msg.data.event === "RunCompleted") {
-            // setAgentResponse(msg.content || "");
+            setAgentResponse((prev) => msg.data.content);
           }
         } else if (msg.type === "task_cancelled") {
           setTaskStatus("cancelled");
@@ -409,6 +409,23 @@ function App() {
               }}
             >
               Energy
+            </button>
+            |
+            <button 
+              type="button"
+              onClick={() => setUserQuery("Write a short story about two students trapped in a haunted house in Montana.")}
+              style={{ 
+                background: "none", 
+                border: "none", 
+                color: "#007bff", 
+                cursor: "pointer",
+                textDecoration: "underline",
+                fontSize: "12px",
+                margin: "0 4px",
+                padding: 0
+              }}
+            >
+              Story
             </button>
           </div>
           <div style={{ fontSize: "12px", color: "#6c757d" }}>
