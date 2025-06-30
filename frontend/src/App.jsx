@@ -72,7 +72,7 @@ function App() {
       setCurrentQuery(data.query || userQuery.trim()); // Store the current query
       
       // Open WebSocket for confirmation/cancellation and user input
-      const socket = new WebSocket(`ws://localhost:8000/api/ws/${data.session_id}`);
+      const socket = new WebSocket(`ws://localhost:8000/api/ws/session/${data.session_id}`);
       setWs(socket);
       
     } catch (error) {
@@ -317,8 +317,8 @@ function App() {
 
   return (
     <div style={{ padding: 32 }}>
-      <h1>Human-in-the-Loop Task Demo</h1>
-      
+      <h4>Human-in-the-Loop Task Demo</h4>
+
       {/* User Query Input Section */}
       <div style={{ 
         background: "#f8f9fa", 

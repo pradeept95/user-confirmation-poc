@@ -7,7 +7,7 @@ ws_router = APIRouter(prefix="/api/ws", tags=["websocket"])
 session_manager = SessionManagerFactory.get_instance()
 ws_manager = WebSocketManagerFactory.get_instance()
 
-@ws_router.websocket("/{session_id}")
+@ws_router.websocket("/session/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     task = session_manager.get_task(session_id)
     if not task:
