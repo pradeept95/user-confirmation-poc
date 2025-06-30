@@ -7,6 +7,7 @@ function App() {
   const [sessionId, setSessionId] = useState(null);
   const [taskStatus, setTaskStatus] = useState("idle");
   const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmationMessage, setConfirmationMessage] = useState("");
   const [ws, setWs] = useState(null);
   const [inputFields, setInputFields] = useState(null);
   const [inputValues, setInputValues] = useState({});
@@ -34,6 +35,7 @@ function App() {
     setAgentResponse(""); // Clear agent response
     setIsGenerating(false);
     setShowConfirm(false);
+    setConfirmationMessage("");
     setShowRetry(false);
     setSubmitted(null);
     setCurrentQuery(""); // Clear current query
@@ -119,6 +121,7 @@ function App() {
     ) {
       setInputFields(null);
       setShowConfirm(false);
+      setConfirmationMessage("");
       setIsGenerating(false);
     }
   }, [taskStatus]);
@@ -137,6 +140,7 @@ function App() {
         const msg = JSON.parse(event.data);
         if (msg.type === "request_confirmation") {
           setShowConfirm(true);
+          setConfirmationMessage(msg.message || "Do you want to proceed with this action?");
         } else if (msg.type === "request_user_input") {
           setInputFields(msg.fields);
           setInputValues({});
@@ -153,8 +157,10 @@ function App() {
         } else if (msg.type === "generating") {
           setIsGenerating(true);
           // Handle agent response streaming
-          if (msg.data && msg.data.content) {
+          if (msg.data && msg.data.content && msg.data.event === "RunResponseContent") {
             setAgentResponse((prev) => prev + msg.data.content);
+          }else if (msg.data && msg.data.content && msg.data.event === "RunCompleted") {
+            // setAgentResponse(msg.content || "");
           }
         } else if (msg.type === "task_cancelled") {
           setTaskStatus("cancelled");
@@ -474,7 +480,7 @@ function App() {
             🤔 Agent Confirmation Required
           </div>
           <div style={{ marginBottom: 12 }}>
-            The agent is requesting permission to proceed with an action. Do you want to continue?
+            {confirmationMessage || "Do you want to proceed with this action?"}
           </div>
           <div style={{ display: "flex", gap: "8px" }}>
             <button 

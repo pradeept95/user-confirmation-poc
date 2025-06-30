@@ -8,6 +8,8 @@ from agno.agent import Agent
 from agno.agent import RunResponseEvent
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.thinking import ThinkingTools
+from agno.tools.reasoning import ReasoningTools
 
 import random
 from service.websocket_manager import WebSocketManager
@@ -294,16 +296,23 @@ async def simulate_chat_completion(session_id: str):
             tools=[
                 # GoogleSearchTools(requires_confirmation_tools=["google_search"]), 
                 DuckDuckGoTools(requires_confirmation_tools=["duckduckgo_search"]),
+                ReasoningTools(
+                    think=True,
+                    analyze=True,
+                    add_instructions=True,
+                    add_few_shot=True,
+                ),
             ],
             add_datetime_to_instructions=True, 
             tool_call_limit=5,
-            show_tool_calls=True,
+            show_tool_calls=False,
             markdown=True,
             debug_mode=True,
+            reasoning=True
         ) 
 
         # Initial async run with user's query
-        for run_response in agent.run(user_query, stream=True):
+        for run_response in agent.run(user_query, stream=True, stream_intermediate_steps=True):
             # Check for cancellation
             if task.cancel_event.is_set(): 
                 await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
@@ -319,7 +328,10 @@ async def simulate_chat_completion(session_id: str):
                         f"Tool name [bold blue]{tool.tool_name}({tool.tool_args})[/] requires confirmation."
                     )
                     # Handle confirmations, user input, or external tool execution
-                    await request_confirmation(session_id)
+                    confirmation_message = (
+                        f"Tool {tool.tool_name} requires confirmation. Do you want to proceed?"
+                    )
+                    await request_confirmation(session_id, confirmation_message)
 
                     if not task.confirmed:
                         tool.confirmed = False
@@ -411,7 +423,7 @@ async def request_user_input(session_id: str, fields):
         }, save_state=True)
         return False
 
-async def request_confirmation(session_id: str):
+async def request_confirmation(session_id: str, message: str = "Do you want to proceed with this action?"):
     task = session_manager.get_task(session_id)
     if not task:
         print(f"No task found for session {session_id}")
@@ -428,7 +440,7 @@ async def request_confirmation(session_id: str):
     
     await ws_manager.send_json(session_id, {
         "type": "request_confirmation", 
-        "message": "Do you want to proceed with this action?"
+        "message": message
     }, save_state=True)
     
     try:
