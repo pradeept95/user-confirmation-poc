@@ -9,7 +9,12 @@ class UserInputRequest:
         self.values = None
 
 class SessionTask:
-    def __init__(self, user_query: str = "Who is the current president of the United States?"):
+    """
+    Represents a session task with user query and state management.
+    This class is used to manage the state of a task, including user confirmation,
+    dynamic input requests, and WebSocket connection readiness.
+    """
+    def __init__(self, user_query: str):
         self.cancel_event = asyncio.Event()
         self.confirm_event = asyncio.Event()
         self.confirmed = None

@@ -1,4 +1,5 @@
 import uuid
+import threading
 from models.types import SessionTask
 
 class SessionManager:
@@ -17,3 +18,17 @@ class SessionManager:
     def remove_session(self, session_id):
         if session_id in self.sessions:
             del self.sessions[session_id]
+
+
+class SessionManagerFactory:
+    _instance = None
+    _lock = threading.Lock()
+
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            with cls._lock:
+                # Double-checked locking pattern
+                if cls._instance is None:
+                    cls._instance = SessionManager()
+        return cls._instance

@@ -1,6 +1,6 @@
 import asyncio
+import threading
 from fastapi import WebSocket
-
 
 class WebSocketManager:
     def __init__(self):
@@ -138,3 +138,29 @@ class WebSocketManager:
         """Clean up connection lock for a session."""
         if session_id in self.connection_locks:
             del self.connection_locks[session_id]
+
+
+class WebSocketManagerFactory:
+    _instance = None
+    _lock = None
+
+    @classmethod
+    async def get_instance_async(cls):
+        if cls._lock is None:
+            cls._lock = asyncio.Lock()
+        
+        if cls._instance is None:
+            async with cls._lock:
+                # Double-checked locking pattern
+                if cls._instance is None:
+                    cls._instance = WebSocketManager()
+        return cls._instance
+
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            with threading.Lock():
+                # Double-checked locking pattern for sync calls
+                if cls._instance is None:
+                    cls._instance = WebSocketManager()
+        return cls._instance
