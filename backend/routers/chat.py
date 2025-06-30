@@ -13,7 +13,7 @@ from agno.tools.reasoning import ReasoningTools
 from config import create_azure_openai_model
 from task.task_manager import start_background_task, request_confirmation
 
-chat_router = APIRouter()
+chat_router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 session_manager = SessionManagerFactory.get_instance()
 ws_manager = WebSocketManagerFactory.get_instance()
@@ -155,7 +155,7 @@ async def chat_completion(session_id: str, user_query: str):
         await ws_manager.send_json(session_id, {"type": "task_failed", "error": str(e)}, save_state=True)
 
 
-@chat_router.post("/start-task")
+@chat_router.post("/completion")
 async def start_task(request: StartTaskRequest, background_tasks: BackgroundTasks):
     # Validate and sanitize the user query
     user_query = request.query.strip()
@@ -179,7 +179,7 @@ async def start_task(request: StartTaskRequest, background_tasks: BackgroundTask
     return {"session_id": session_id, "query": user_query}
 
 
-@chat_router.post("/cancel-task/{session_id}")
+@chat_router.post("/cancel/{session_id}")
 async def cancel_task(session_id: str):
     task = session_manager.get_task(session_id)
     if task:
@@ -187,7 +187,7 @@ async def cancel_task(session_id: str):
         return {"status": "cancelled"}
     return JSONResponse(status_code=404, content={"error": "Session not found"})
 
-@chat_router.get("/session-info/{session_id}")
+@chat_router.get("/session/{session_id}")
 async def get_session_info(session_id: str):
     """Get session information including state count for debugging."""
     task = session_manager.get_task(session_id)

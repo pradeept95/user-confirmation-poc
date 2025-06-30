@@ -51,7 +51,7 @@ function App() {
     abortController.current = controller;
     
     try {
-      const res = await fetch("http://localhost:8000/start-task", {
+      const res = await fetch("http://localhost:8000/api/chat/completion", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -72,7 +72,7 @@ function App() {
       setCurrentQuery(data.query || userQuery.trim()); // Store the current query
       
       // Open WebSocket for confirmation/cancellation and user input
-      const socket = new WebSocket(`ws://localhost:8000/ws/${data.session_id}`);
+      const socket = new WebSocket(`ws://localhost:8000/api/ws/${data.session_id}`);
       setWs(socket);
       
     } catch (error) {
@@ -88,7 +88,7 @@ function App() {
       abortController.current.abort();
     }
     if (sessionId) {
-      await fetch(`http://localhost:8000/cancel-task/${sessionId}`, {
+      await fetch(`http://localhost:8000/api/chat/cancel/${sessionId}`, {
         method: "POST",
       });
     }

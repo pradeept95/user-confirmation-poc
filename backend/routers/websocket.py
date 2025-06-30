@@ -2,12 +2,12 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from service.session_manager import SessionManagerFactory
 from service.websocket_manager import WebSocketManagerFactory
 
-ws_router = APIRouter()
+ws_router = APIRouter(prefix="/api/ws", tags=["websocket"])
 
 session_manager = SessionManagerFactory.get_instance()
 ws_manager = WebSocketManagerFactory.get_instance()
 
-@ws_router.websocket("/ws/{session_id}")
+@ws_router.websocket("/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     task = session_manager.get_task(session_id)
     if not task:
