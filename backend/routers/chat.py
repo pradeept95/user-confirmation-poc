@@ -8,6 +8,7 @@ from service.websocket_manager import WebSocketManagerFactory
 from agno.agent import Agent
 from agno.agent import RunResponseEvent
 from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.reasoning import ReasoningTools
 
 from config import create_azure_openai_model
@@ -57,7 +58,7 @@ async def chat_completion(session_id: str, user_query: str):
                 "If you need more information, ask the user for input.",
             ],
             tools=[
-                # GoogleSearchTools(requires_confirmation_tools=["google_search"]), 
+                GoogleSearchTools(requires_confirmation_tools=["google_search"]), 
                 DuckDuckGoTools(requires_confirmation_tools=["duckduckgo_search"]),
                 ReasoningTools(
                     think=True,
@@ -70,8 +71,9 @@ async def chat_completion(session_id: str, user_query: str):
             tool_call_limit=5,
             show_tool_calls=False,
             markdown=True,
-            # debug_mode=True,
+            debug_mode=True,
             reasoning=True
+            
         ) 
 
         # Initial async run with user's query
