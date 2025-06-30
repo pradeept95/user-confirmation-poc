@@ -3,7 +3,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Background
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
-from config import create_ollama_model
+from config import create_ollama_model, create_azure_openai_model
 from agno.agent import Agent
 from agno.agent import RunResponseEvent
 from agno.tools.googlesearch import GoogleSearchTools
@@ -282,7 +282,8 @@ async def simulate_chat_completion(session_id: str):
         }, save_state=True)
 
         agent = Agent(
-            model=create_ollama_model("llama3.2:3b"),
+            # model=create_ollama_model("llama3.2:3b"),
+            model=create_azure_openai_model(),
             name="Web Search Agent",
             description="An agent that performs web searches and retrieves information.",
             instructions=[
@@ -291,13 +292,14 @@ async def simulate_chat_completion(session_id: str):
                 "If you need more information, ask the user for input.",
             ],
             tools=[
-                GoogleSearchTools(requires_confirmation_tools=["google_search"]), 
+                # GoogleSearchTools(requires_confirmation_tools=["google_search"]), 
                 DuckDuckGoTools(requires_confirmation_tools=["duckduckgo_search"]),
             ],
             add_datetime_to_instructions=True, 
             tool_call_limit=5,
             show_tool_calls=True,
-            markdown=True
+            markdown=True,
+            debug_mode=True,
         ) 
 
         # Initial async run with user's query
@@ -310,16 +312,35 @@ async def simulate_chat_completion(session_id: str):
             # Handle paused states (confirmations, user input, etc.)
             if run_response.is_paused:
                 print(f"Task {session_id} is paused. Waiting for user input or confirmation...")
-                # Handle confirmations, user input, or external tool execution
-                await request_confirmation(session_id)
 
-                if not task.confirmed:
-                    print(f"Task {session_id} not confirmed by user.")
-                    await ws_manager.send_json(session_id, {"type": "task_not_confirmed", "content": "Task not confirmed by user."}, save_state=True)
-                    return
-                else:
-                    print(f"Task {session_id} confirmed by user. Continuing run...")
-                    run_response = agent.continue_run(stream=True)
+                for tool in agent.run_response.tools_requiring_confirmation:
+                    # Ask for confirmation
+                    print(
+                        f"Tool name [bold blue]{tool.tool_name}({tool.tool_args})[/] requires confirmation."
+                    )
+                    # Handle confirmations, user input, or external tool execution
+                    await request_confirmation(session_id)
+
+                    if not task.confirmed:
+                        tool.confirmed = False
+                    else:
+                        tool.confirmed = True
+
+                # continue the run after confirmation
+                run_response = agent.continue_run(stream=True)
+                
+
+                # if not task.confirmed:
+                #     for tool in run_response.tools_requiring_confirmation:
+                #         tool.confirmed = False
+                #     print(f"Task {session_id} not confirmed by user.")
+                #     await ws_manager.send_json(session_id, {"type": "task_not_confirmed", "content": "Task not confirmed by user."}, save_state=True)
+                #     return
+                # else:
+                #     for tool in run_response.tools_requiring_confirmation:  
+                #         tool.confirmed = True
+                #     print(f"Task {session_id} confirmed by user. Continuing run...")
+                 
 
             # check if run_response is RunResponseEvent event type
             if  isinstance(run_response, RunResponseEvent):
