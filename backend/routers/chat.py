@@ -56,6 +56,8 @@ async def chat_completion(session_id: str, user_query: str):
                 "Provide accurate and relevant information based on the user's query.", 
                 "Always include the reference links in your response.",
                 "If you need more information, ask the user for input.",
+                f"Current session ID is {session_id}.",
+                "if user needs to provide input, use the get_user_input tool.",
             ],
             tools=[
                 GoogleSearchTools(requires_confirmation_tools=["google_search"]), 
@@ -65,11 +67,11 @@ async def chat_completion(session_id: str, user_query: str):
                     analyze=True,
                     add_instructions=True,
                     add_few_shot=True,
-                ),
+                )
             ],
-            add_datetime_to_instructions=True, 
+            add_datetime_to_instructions=True,
             tool_call_limit=5,
-            show_tool_calls=False,
+            show_tool_calls=True,
             markdown=True,
             debug_mode=True,
             reasoning=True
