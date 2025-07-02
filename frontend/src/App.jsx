@@ -309,6 +309,12 @@ function App() {
         ws.onclose = null;
         ws.onopen = null;
         ws.onerror = null;
+
+        // Close WebSocket if it's still open
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          console.log("Closing WebSocket on component unmount");
+          ws.close();
+        }
       }
     };
   }, [ws]);
