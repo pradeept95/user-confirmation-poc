@@ -24,7 +24,10 @@ function App() {
   const startTask = async () => {
     // Clean up existing WebSocket connection if any
     if (ws) {
-      ws.close();
+      console.log("Closing existing WebSocket before starting new task");
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close();
+      }
       setWs(null);
     }
     
@@ -139,7 +142,7 @@ function App() {
         console.log("WebSocket message received:", event.data);
         const msg = JSON.parse(event.data);
         if (msg.type === "request_confirmation") {
-          setShowConfirm(true);
+          setShowConfirm(true);``
           setConfirmationMessage(msg.message || "Do you want to proceed with this action?");
         } else if (msg.type === "request_user_input") {
           setInputFields(msg.fields);
@@ -148,6 +151,14 @@ function App() {
           setTaskStatus("completed");
           setSubmitted(msg.values);
           setIsGenerating(false);
+          // close WebSocket after task completion
+          console.log("Task completed from state replay, closing WebSocket");
+          setTimeout(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.close();
+            }
+          }, 100);
+          console.log("Task completed, closing WebSocket");
         } else if (msg.type === "task_started") {
           setTaskStatus("running");
           setIsGenerating(true);
@@ -227,6 +238,14 @@ function App() {
                 setTaskStatus("completed");
                 setSubmitted(stateMsg.values);
                 setIsGenerating(false);
+                // close WebSocket after task completion
+                console.log("Task completed, closing WebSocket");
+                console.log("Task completed from state replay, closing WebSocket");
+                setTimeout(() => {
+                  if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.close();
+                  }
+                }, 100);
               } else if (stateMsg.type === "task_started") {
                 setTaskStatus("running");
                 setIsGenerating(true);
