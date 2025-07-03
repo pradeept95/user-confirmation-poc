@@ -154,7 +154,7 @@ const InlineCode = ({ node, inline, className, children, ...props }: any) => {
         PreTag="div"
         {...props}
         className={cn(
-          "rounded-md bg-muted/80 px-4 py-3 text-sm font-mono border border-border/40 dark:bg-muted/60 dark:border-border/60 overflow-x-auto",
+          "rounded-md bg-muted/80 px-4 py-6 text-sm font-mono border border-border/40 dark:bg-muted/60 dark:border-border/60 overflow-x-auto",
           className
         )}
         wrapLines
@@ -185,7 +185,7 @@ const InlineCode = ({ node, inline, className, children, ...props }: any) => {
 
       {/* Language Label */}
       {match[1] && (
-        <div className="absolute top-3 left-3 px-2 py-1 rounded-sm bg-background/80 border border-border/60 text-xs font-medium text-muted-foreground">
+        <div className="absolute top-[-13px] left-[0px] p-1 rounded-sm bg-background/40 border border-border/60 text-xs font-medium text-muted-foreground">
           {match[1]}
         </div>
       )}
@@ -193,7 +193,7 @@ const InlineCode = ({ node, inline, className, children, ...props }: any) => {
   ) : (
     <code
       className={cn(
-        "whitespace-pre-wrap rounded-md bg-muted/80 px-1.5 py-0.5 text-sm font-mono text-foreground border border-border/40 dark:bg-muted/60 dark:border-border/60 break-words",
+        "whitespace-pre-wrap rounded-md px-1.5 py-0.5 text-sm font-mono text-foreground border border-border/40 dark:border-border/60 break-words",
         className
       )}
       {...props}

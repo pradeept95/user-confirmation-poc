@@ -305,7 +305,7 @@ const MessageArea = () => {
       initial="instant"
     >
       <StickToBottom.Content className="flex min-h-full flex-col justify-center">
-        <div className="mx-auto w-full max-w-2xl space-y-9 px-4 pb-4">
+        <div className="mx-auto w-full max-w-3xl space-y-9 px-4 pb-4">
           <Messages messages={[...messages, ...messages, ...messages]} />
         </div>
       </StickToBottom.Content>
