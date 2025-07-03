@@ -1,12 +1,12 @@
 import Icon from "@/components/icon";
-import MarkdownRenderer from "@/components/typography/MarkdownRenderer";
+import MarkdownRenderer from "@/components/typography/markdown-renderer";
 import { usePlaygroundStore } from "@/store";
 import type { PlaygroundChatMessage } from "@/types/app-types";
 import Videos from "./multimedia/videos";
 import Images from "./multimedia/images";
 import Audios from "./multimedia/audios";
 import { memo } from "react";
-import AgentThinkingLoader from "./AgentThinkingLoader";
+import AgentThinkingLoader from "./thinking-loader";
 
 interface MessageProps {
   message: PlaygroundChatMessage;

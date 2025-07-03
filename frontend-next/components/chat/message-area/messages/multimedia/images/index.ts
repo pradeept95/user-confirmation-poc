@@ -1,3 +1,3 @@
-import Images from './Images'
+import Images from "./image-message";
 
-export default Images
+export default Images;

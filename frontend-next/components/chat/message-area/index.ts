@@ -1,3 +1,3 @@
-import MessageArea from "./MessageArea";
+import MessageArea from "./message-area";
 
 export { MessageArea };

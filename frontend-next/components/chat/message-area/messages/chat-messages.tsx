@@ -1,6 +1,6 @@
 import type { PlaygroundChatMessage } from "@/types/app-types";
 
-import { AgentMessage, UserMessage } from "./MessageItem";
+import { AgentMessage, UserMessage } from "./chat-message-item";
 import Tooltip from "@/components/tooltip";
 import { memo } from "react";
 import {
@@ -11,7 +11,7 @@ import {
   Reference,
 } from "@/types/app-types";
 import React, { type FC } from "react";
-import ChatBlankState from "./ChatBlankState";
+import ChatBlankState from "./chat-blank-state";
 import Icon from "@/components/icon";
 
 interface MessageListProps {

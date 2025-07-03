@@ -1,3 +1,3 @@
-import Paragraph from './Paragraph'
+import Paragraph from "./paragraph";
 
-export default Paragraph
+export default Paragraph;

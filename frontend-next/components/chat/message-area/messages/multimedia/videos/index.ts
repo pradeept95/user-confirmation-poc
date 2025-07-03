@@ -1,3 +1,3 @@
-import Videos from './Videos'
+import Videos from "./video-message";
 
-export default Videos
+export default Videos;
