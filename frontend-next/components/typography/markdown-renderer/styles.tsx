@@ -1,11 +1,12 @@
 "use client";
 
 import { FC, useEffect, useRef, useState } from "react";
-
+import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import mermaid from "mermaid";
+
 
 import type {
   UnorderedListProps,
@@ -30,7 +31,6 @@ import type {
   TableCellProps,
 } from "./types";
 
-import { HEADING_SIZES } from "../heading/constants";
 import { PARAGRAPH_SIZES } from "../paragraph/constants";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import {
@@ -38,7 +38,17 @@ import {
   vscDarkPlus,
 } from "react-syntax-highlighter/dist/esm/styles/prism"; // Or any other theme
 import { useTheme } from "next-themes";
-import { Check, Copy, Download } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Download,
+  Maximize2,
+  RotateCw,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
+import { HEADING_SIZES } from "../heading/constants";
 
 const filterProps = (props: object) => {
   const newProps = { ...props };
@@ -414,36 +424,352 @@ const Heading6 = ({ className, ...props }: HeadingProps) => (
   />
 );
 
+const ImagePreview: FC<{
+  src: string;
+  alt: string;
+  isOpen: boolean;
+  onClose: () => void;
+}> = ({ src, alt, isOpen, onClose }) => {
+  const [scale, setScale] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const imageRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+
+      switch (e.key) {
+        case "Escape":
+          onClose();
+          break;
+        case "+":
+        case "=":
+          handleZoomIn();
+          break;
+        case "-":
+          handleZoomOut();
+          break;
+        case "r":
+        case "R":
+          handleRotate();
+          break;
+        case "0":
+          handleReset();
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
+
+  const handleZoomIn = () => {
+    setScale((prev) => Math.min(prev * 1.2, 5));
+  };
+
+  const handleZoomOut = () => {
+    setScale((prev) => Math.max(prev / 1.2, 0.1));
+  };
+
+  const handleRotate = () => {
+    setRotation((prev) => (prev + 90) % 360);
+  };
+
+  const handleReset = () => {
+    setScale(1);
+    setRotation(0);
+    setPosition({ x: 0, y: 0 });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (scale <= 1) return;
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y,
+    });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || scale <= 1) return;
+    setPosition({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y,
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleDownload = async () => {
+    try {
+      // Fetch the image as blob to force download
+      const response = await fetch(src);
+      const blob = await response.blob();
+
+      // Get file extension from URL or blob type
+      const urlParts = src.split('.');
+      const extension = urlParts[urlParts.length - 1]?.split('?')[0] || 
+                      blob.type.split('/')[1] || 'jpg';
+
+      // Create object URL from blob
+      const url = URL.createObjectURL(blob);
+
+      // Create download link with proper filename
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${alt || 'image'}.${extension}`;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Clean up object URL
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to download image:", error);
+      // Fallback to original method if fetch fails
+      const link = document.createElement("a");
+      link.href = src;
+      link.download = alt || "image";
+      link.click();
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          {/* Backdrop */}
+          <motion.div
+            className="absolute inset-0 cursor-pointer bg-black/90 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={onClose}
+          />
+
+          {/* Controls */}
+          <motion.div
+            className="absolute top-4 left-4 right-4 flex items-center justify-between z-10"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3, delay: 0.1 }}
+          >
+            <div className="flex items-center gap-2">
+              <motion.button
+                onClick={handleZoomOut}
+                className="p-2 rounded-md bg-black/50 hover:bg-black/70 text-white transition-colors"
+                title="Zoom Out (-)"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <ZoomOut className="h-4 w-4" />
+              </motion.button>
+              <motion.button
+                onClick={handleZoomIn}
+                className="p-2 rounded-md bg-black/50 hover:bg-black/70 text-white transition-colors"
+                title="Zoom In (+)"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <ZoomIn className="h-4 w-4" />
+              </motion.button>
+              <motion.button
+                onClick={handleRotate}
+                className="p-2 rounded-md bg-black/50 hover:bg-black/70 text-white transition-colors"
+                title="Rotate (R)"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <RotateCw className="h-4 w-4" />
+              </motion.button>
+              <motion.button
+                onClick={handleReset}
+                className="p-2 rounded-md bg-black/50 hover:bg-black/70 text-white transition-colors text-sm"
+                title="Reset (0)"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                1:1
+              </motion.button>
+              <motion.span
+                className="text-white text-sm bg-black/50 px-2 py-1 rounded"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+              >
+                {Math.round(scale * 100)}%
+              </motion.span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <motion.button
+                onClick={handleDownload}
+                className="p-2 rounded-md bg-black/50 hover:bg-black/70 text-white transition-colors"
+                title="Download"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Download className="h-4 w-4" />
+              </motion.button>
+              <motion.button
+                onClick={onClose}
+                className="p-2 rounded-md bg-black/50 hover:bg-black/70 text-white transition-colors"
+                title="Close (Esc)"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <X className="h-4 w-4" />
+              </motion.button>
+            </div>
+          </motion.div>
+
+          {/* Image Container */}
+          <motion.div
+            className="relative flex items-center justify-center w-full h-full overflow-hidden"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            transition={{ duration: 0.3, type: "spring", stiffness: 300, damping: 30 }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            style={{
+              cursor: scale > 1 ? (isDragging ? "grabbing" : "grab") : "default",
+            }}
+          >
+            <motion.div
+              animate={{
+                scale: scale,
+                rotate: rotation,
+                x: position.x,
+                y: position.y,
+              }}
+              transition={{
+                duration: isDragging ? 0 : 0.2,
+                type: "tween",
+              }}
+              style={{ transformOrigin: "center center" }}
+            >
+              <Image
+                ref={imageRef}
+                src={src}
+                alt={alt}
+                width={1280}
+                height={720}
+                className="max-w-none max-h-none object-contain select-none"
+                unoptimized
+                priority
+              />
+            </motion.div>
+          </motion.div>
+
+          {/* Help Text */}
+          <motion.div
+            className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white/70 text-xs bg-black/50 px-3 py-1 rounded"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+          >
+            Use mouse wheel to zoom • Drag to pan • Press R to rotate • Press 0 to reset
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+// Enhanced Img component with motion
 const Img = ({ src, alt }: ImgProps) => {
   const [error, setError] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   if (!src) return null;
 
   return (
-    <div className="w-full max-w-xl">
-      {error ? (
-        <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-md bg-secondary/50 text-muted">
-          <Paragraph className="text-primary">Image unavailable</Paragraph>
-          <Link
-            href={src as string}
-            target="_blank"
-            className="max-w-md truncate underline"
+    <>
+      <div className="w-full max-w-xl mt-4">
+        {error ? (
+          <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-md bg-secondary/50 text-muted">
+            <Paragraph className="text-primary">Image unavailable</Paragraph>
+            <Link
+              href={src as string}
+              target="_blank"
+              className="max-w-md truncate underline"
+            >
+              {src as string}
+            </Link>
+          </div>
+        ) : (
+          <motion.div
+            className="relative group cursor-pointer"
+            whileHover={{ scale: 1.02 }}
+            transition={{ duration: 0.2 }}
           >
-            {src as string}
-          </Link>
-        </div>
-      ) : (
-        <Image
-          src={src as string}
-          width={1280}
-          height={720}
-          alt={alt ?? "Rendered image"}
-          className="size-full rounded-md object-cover"
-          onError={() => setError(true)}
-          unoptimized
-        />
-      )}
-    </div>
+            <Image
+              src={src as string}
+              width={1280}
+              height={720}
+              alt={alt ?? "Rendered image"}
+              className="size-full rounded-md object-cover"
+              onError={() => setError(true)}
+              onClick={() => setIsPreviewOpen(true)}
+              unoptimized
+            />
+            {/* Zoom overlay */}
+            <motion.button
+              onClick={() => setIsPreviewOpen(true)}
+              className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors rounded-md"
+              whileHover={{ backgroundColor: "rgba(0,0,0,0.2)" }}
+            >
+              <motion.div
+                className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 dark:bg-black/90 rounded-full p-2"
+                initial={{ scale: 0.8, opacity: 0 }}
+                whileHover={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Maximize2 className="h-5 w-5 text-black dark:text-white" />
+              </motion.div>
+            </motion.button>
+          </motion.div>
+        )}
+      </div>
+
+      {/* Image Preview Modal */}
+      <ImagePreview
+        src={src as string}
+        alt={alt ?? "Rendered image"}
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+      />
+    </>
   );
 };
 

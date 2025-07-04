@@ -9,3 +9,11 @@ ollama
 googlesearch-python
 duckduckgo-search
 pycountry
+
+PyPDF2
+pymupdf
+pdfplumber
+pdfminer.six
+pymupdf4llm
+pdfplumber
+markdownify

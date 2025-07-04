@@ -69,6 +69,7 @@ async def chat_completion(session_id: str, user_query: str):
                     add_few_shot=True,
                 )
             ],
+            resolve_context=False,
             add_datetime_to_instructions=True,
             tool_call_limit=5,
             show_tool_calls=True,
