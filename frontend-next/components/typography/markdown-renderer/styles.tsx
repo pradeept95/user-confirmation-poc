@@ -1,10 +1,11 @@
 "use client";
 
-import { FC, useState } from "react";
+import { FC, useEffect, useRef, useState } from "react";
 
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import mermaid from "mermaid";
 
 import type {
   UnorderedListProps,
@@ -37,7 +38,7 @@ import {
   vscDarkPlus,
 } from "react-syntax-highlighter/dist/esm/styles/prism"; // Or any other theme
 import { useTheme } from "next-themes";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Download } from "lucide-react";
 
 const filterProps = (props: object) => {
   const newProps = { ...props };
@@ -127,6 +128,164 @@ const HorizontalRule = ({ className, ...props }: HorizontalRuleProps) => (
   />
 );
 
+const MermaidRenderer: FC<{ children: string }> = ({ children }) => {
+  const { systemTheme, theme } = useTheme();
+  const [svg, setSvg] = useState<string>("");
+  const [error, setError] = useState<string>("");
+  const [isCopied, setIsCopied] = useState(false);
+  const mermaidRef = useRef<HTMLDivElement>(null);
+
+  const isDarkTheme =
+    theme === "dark" || (theme === "system" && systemTheme === "dark");
+
+  useEffect(() => {
+    const renderMermaid = async () => {
+      try {
+        // Configure mermaid for theme
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: isDarkTheme ? "dark" : "default",
+          themeVariables: {
+            primaryColor: isDarkTheme ? "#3b82f6" : "#2563eb",
+            primaryTextColor: isDarkTheme ? "#f1f5f9" : "#1e293b",
+            primaryBorderColor: isDarkTheme ? "#64748b" : "#cbd5e1",
+            lineColor: isDarkTheme ? "#64748b" : "#94a3b8",
+            secondaryColor: isDarkTheme ? "#1e293b" : "#f1f5f9",
+            tertiaryColor: isDarkTheme ? "#0f172a" : "#ffffff",
+            background: isDarkTheme ? "#0f172a" : "#ffffff",
+            mainBkg: isDarkTheme ? "#1e293b" : "#f8fafc",
+            secondBkg: isDarkTheme ? "#334155" : "#e2e8f0",
+            tertiaryBkg: isDarkTheme ? "#475569" : "#cbd5e1",
+          },
+          suppressErrorRendering: true,
+        });
+
+        const id = `mermaid-${Date.now()}-${Math.random()
+          .toString(36)
+          .substr(2, 9)}`;
+        const { svg: renderedSvg } = await mermaid.render(id, children.trim());
+        setSvg(renderedSvg);
+        setError("");
+      } catch (err) {
+        console.error("Mermaid rendering error:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to render diagram"
+        );
+        setSvg("");
+      }
+    };
+
+    if (children.trim()) {
+      renderMermaid();
+    }
+  }, [children, isDarkTheme]);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(children);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy mermaid code:", err);
+    }
+  };
+
+  const handleDownloadDiagram = () => {
+    const blob = new Blob([svg], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "diagram.svg";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  if (error) {
+    return (
+      <div className="relative group">
+        <div className="rounded-md bg-destructive/10 border border-destructive/20 p-4">
+          <div className="text-destructive text-sm font-medium mb-2">
+            Mermaid Diagram Error
+          </div>
+          <div className="text-destructive/80 text-xs mb-3 whitespace-break-spaces">
+            {error}
+          </div>
+          <pre className="text-xs bg-muted/50 p-2 rounded overflow-x-hidden block whitespace-pre-wrap">
+            {children}
+          </pre>
+        </div>
+
+        {/* Copy Button */}
+        <button
+          onClick={handleCopy}
+          className="absolute top-3 right-3 p-2 rounded-md bg-background/80 hover:bg-background border border-border/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
+          aria-label={isCopied ? "Copied!" : "Copy mermaid code"}
+        >
+          {isCopied ? (
+            <Check className="h-4 w-4 text-green-500" />
+          ) : (
+            <Copy className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+          )}
+        </button>
+        {/* Download Button */}
+        <button
+          onClick={handleDownloadDiagram}
+          className="absolute top-3 right-12 p-2 rounded-md bg-background/80 hover:bg-background border border-border/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
+          aria-label="Download mermaid diagram"
+        >
+          <Download className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+        </button>
+
+        {/* Language Label */}
+        <div className="absolute top-[-13px] left-[0px] p-1 rounded-sm bg-background/90 border border-border/60 text-xs font-medium text-muted-foreground">
+          mermaid
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative group">
+      <div className="rounded-md bg-muted/80 border border-border/40 dark:bg-muted/60 dark:border-border/60 p-4 overflow-x-auto">
+        <div
+          ref={mermaidRef}
+          className="flex justify-center items-center"
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      </div>
+
+      {/* Download Button */}
+      <button
+        onClick={handleDownloadDiagram}
+        className="absolute top-3 right-12 p-2 rounded-md bg-background/80 hover:bg-background border border-border/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
+        aria-label="Download mermaid diagram"
+      >
+        <Download className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+      </button>
+
+      {/* Copy Button */}
+      <button
+        onClick={handleCopy}
+        className="absolute top-3 right-3 p-2 rounded-md bg-background/80 hover:bg-background border border-border/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
+        aria-label={isCopied ? "Copied!" : "Copy mermaid code"}
+      >
+        {isCopied ? (
+          <Check className="h-4 w-4 text-green-500" />
+        ) : (
+          <Copy className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+        )}
+      </button>
+
+      {/* Language Label */}
+      <div className="absolute top-[-13px] left-[0px] p-1 rounded-sm bg-background/90 border border-border/60 text-xs font-medium text-muted-foreground">
+        mermaid
+      </div>
+    </div>
+  );
+};
+
 const InlineCode = ({ node, inline, className, children, ...props }: any) => {
   const { systemTheme, theme } = useTheme();
   const [isCopied, setIsCopied] = useState(false);
@@ -145,6 +304,11 @@ const InlineCode = ({ node, inline, className, children, ...props }: any) => {
       console.error("Failed to copy code:", err);
     }
   };
+
+  // Handle Mermaid diagrams
+  if (!inline && match && match[1] === "mermaid") {
+    return <MermaidRenderer>{String(children)}</MermaidRenderer>;
+  }
 
   return !inline && match ? (
     <div className="relative group">
@@ -185,7 +349,7 @@ const InlineCode = ({ node, inline, className, children, ...props }: any) => {
 
       {/* Language Label */}
       {match[1] && (
-        <div className="absolute top-[-13px] left-[0px] p-1 rounded-sm bg-background/40 border border-border/60 text-xs font-medium text-muted-foreground">
+        <div className="absolute top-[-13px] left-[0px] p-1 rounded-sm bg-background/90 border border-border/60 text-xs font-medium text-muted-foreground">
           {match[1]}
         </div>
       )}

@@ -293,6 +293,120 @@ const dummyMessages: PlaygroundChatMessage[] = [
       },
     ],
   },
+  {
+    role: "user",
+    content:
+      "Can you show me some diagrams for the Azure Container Apps architecture?",
+    created_at: Date.now() - 10000,
+  },
+  {
+    role: "agent",
+    content: `Here are some diagrams showing Azure Container Apps architecture and workflows:
+  
+  ## Container Apps Architecture
+  
+  \`\`\`mermaid
+  graph TB
+      subgraph "Azure Container Apps Environment"
+          CA1[Container App 1]
+          CA2[Container App 2]
+          CA3[Container App 3]
+      end
+      
+      subgraph "Azure Services"
+          ACR[Azure Container Registry]
+          KV[Key Vault]
+          LA[Log Analytics]
+          AI[Application Insights]
+      end
+      
+      subgraph "External"
+          User[Users]
+          API[External APIs]
+      end
+      
+      User --> CA1
+      User --> CA2
+      CA1 --> CA3
+      CA2 --> CA3
+      CA1 --> API
+      CA2 --> ACR
+      CA3 --> KV
+      CA1 --> LA
+      CA2 --> AI
+      
+      style CA1 fill:#e1f5fe
+      style CA2 fill:#e1f5fe
+      style CA3 fill:#e1f5fe
+      style ACR fill:#f3e5f5
+      style KV fill:#f3e5f5
+  \`\`\`
+  
+  ## Deployment Flow
+  
+  \`\`\`mermaid
+  sequenceDiagram something cause error
+      participant Dev as Developer
+      participant GH as GitHub
+      participant ACR as Azure Container Registry
+      participant CA as Container Apps
+      participant User as End User
+      
+      Dev->>GH: Push code
+      GH->>GH: Build & Test
+      GH->>ACR: Push container image
+      GH->>CA: Deploy to Container Apps
+      CA->>ACR: Pull latest image
+      CA->>CA: Update running containers
+      User->>CA: Access application
+      CA->>User: Response
+  \`\`\`
+  
+  ## Auto-scaling Process
+  
+  \`\`\`mermaid
+  flowchart LR
+      A[Incoming Requests] --> B{Load Check}
+      B -->|Low Load| C[Scale Down]
+      B -->|High Load| D[Scale Up]
+      B -->|No Load| E[Scale to Zero]
+      
+      C --> F[Reduce Replicas]
+      D --> G[Add Replicas]
+      E --> H[Stop All Replicas]
+      
+      F --> I[Monitor Load]
+      G --> I
+      H --> I
+      
+      I --> B
+      
+      style A fill:#e8f5e8
+      style B fill:#fff2cc
+      style C fill:#e1f5fe
+      style D fill:#ffebee
+      style E fill:#f3e5f5
+  \`\`\`
+  
+  These diagrams show the key components and processes in Azure Container Apps! 🚀`,
+    created_at: Date.now() - 2000,
+    tool_calls: [
+      {
+        role: "tool",
+        content: "Generated architecture diagrams for Azure Container Apps",
+        tool_call_id: "call_mermaid_123",
+        tool_name: "diagram_generator",
+        tool_args: {
+          type: "mermaid",
+        },
+        tool_call_error: false,
+        metrics: {
+          time: 1800,
+        },
+        created_at: Date.now() - 5000,
+      },
+    ],
+  },
 ];
 
 const MessageArea = () => {
