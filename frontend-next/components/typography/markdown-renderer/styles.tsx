@@ -7,7 +7,6 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import mermaid from "mermaid";
 
-
 import type {
   UnorderedListProps,
   OrderedListProps,
@@ -36,8 +35,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import {
   vs,
   vscDarkPlus,
-} from "react-syntax-highlighter/dist/esm/styles/prism"; // Or any other theme
-import { useTheme } from "next-themes";
+} from "react-syntax-highlighter/dist/esm/styles/prism";
 import {
   Check,
   Copy,
@@ -49,6 +47,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { HEADING_SIZES } from "../heading/constants";
+import useIsDarkMode from "@/hook/use-is-dark-mode";
 
 const filterProps = (props: object) => {
   const newProps = { ...props };
@@ -139,14 +138,12 @@ const HorizontalRule = ({ className, ...props }: HorizontalRuleProps) => (
 );
 
 const MermaidRenderer: FC<{ children: string }> = ({ children }) => {
-  const { systemTheme, theme } = useTheme();
   const [svg, setSvg] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [isCopied, setIsCopied] = useState(false);
   const mermaidRef = useRef<HTMLDivElement>(null);
 
-  const isDarkTheme =
-    theme === "dark" || (theme === "system" && systemTheme === "dark");
+  const isDarkTheme = useIsDarkMode();
 
   useEffect(() => {
     const renderMermaid = async () => {
@@ -298,11 +295,9 @@ const MermaidRenderer: FC<{ children: string }> = ({ children }) => {
 
 /* eslint-disable-next-line */
 const InlineCode = ({ inline, className, children, ...props }: any) => {
-  const { systemTheme, theme } = useTheme();
   const [isCopied, setIsCopied] = useState(false);
 
-  const isDarkTheme =
-    theme === "dark" || (theme === "system" && systemTheme === "dark");
+  const isDarkTheme = useIsDarkMode();
   const match = /language-(\w+)/.exec(className || "");
 
   const handleCopy = async () => {
@@ -524,9 +519,11 @@ const ImagePreview: FC<{
       const blob = await response.blob();
 
       // Get file extension from URL or blob type
-      const urlParts = src.split('.');
-      const extension = urlParts[urlParts.length - 1]?.split('?')[0] || 
-                      blob.type.split('/')[1] || 'jpg';
+      const urlParts = src.split(".");
+      const extension =
+        urlParts[urlParts.length - 1]?.split("?")[0] ||
+        blob.type.split("/")[1] ||
+        "jpg";
 
       // Create object URL from blob
       const url = URL.createObjectURL(blob);
@@ -534,7 +531,7 @@ const ImagePreview: FC<{
       // Create download link with proper filename
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${alt || 'image'}.${extension}`;
+      link.download = `${alt || "image"}.${extension}`;
 
       // Trigger download
       document.body.appendChild(link);
@@ -656,13 +653,19 @@ const ImagePreview: FC<{
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}
-            transition={{ duration: 0.3, type: "spring", stiffness: 300, damping: 30 }}
+            transition={{
+              duration: 0.3,
+              type: "spring",
+              stiffness: 300,
+              damping: 30,
+            }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
             style={{
-              cursor: scale > 1 ? (isDragging ? "grabbing" : "grab") : "default",
+              cursor:
+                scale > 1 ? (isDragging ? "grabbing" : "grab") : "default",
             }}
           >
             <motion.div
@@ -699,7 +702,8 @@ const ImagePreview: FC<{
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.3, delay: 0.2 }}
           >
-            Use mouse wheel to zoom • Drag to pan • Press R to rotate • Press 0 to reset
+            Use mouse wheel to zoom • Drag to pan • Press R to rotate • Press 0
+            to reset
           </motion.div>
         </motion.div>
       )}
