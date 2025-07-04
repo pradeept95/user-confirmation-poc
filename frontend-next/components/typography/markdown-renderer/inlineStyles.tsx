@@ -23,8 +23,8 @@ import type {
   ImgProps,
   ParagraphProps,
 } from "./types";
-
 import { PARAGRAPH_SIZES } from "../paragraph/constants";
+ 
 
 const filterProps = (props: object) => {
   const newProps = { ...props };

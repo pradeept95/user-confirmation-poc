@@ -1,9 +1,9 @@
 import { type FC } from "react";
 
 import { cn } from "@/lib/utils";
-
-import { PARAGRAPH_SIZES } from "./constants";
+ 
 import { type ParagraphProps } from "./types";
+import { PARAGRAPH_SIZES } from "./constants";
 
 const Paragraph: FC<ParagraphProps> = ({
   children,

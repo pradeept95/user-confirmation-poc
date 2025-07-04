@@ -296,7 +296,8 @@ const MermaidRenderer: FC<{ children: string }> = ({ children }) => {
   );
 };
 
-const InlineCode = ({ node, inline, className, children, ...props }: any) => {
+/* eslint-disable-next-line */
+const InlineCode = ({ inline, className, children, ...props }: any) => {
   const { systemTheme, theme } = useTheme();
   const [isCopied, setIsCopied] = useState(false);
 
