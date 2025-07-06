@@ -1,7 +1,7 @@
 import { ReasoningSteps, ToolCall, useChatStore } from "@/store/chat-store";
 import { useEffect, useRef, useState } from "react";
 
-type MessageTypes =
+export type MessageTypes =
   | "initial_state"
   | "connection_ready"
   | "connection_acknowledged"
@@ -13,9 +13,9 @@ type MessageTypes =
   | "request_user_input"
   | "request_confirmation";
 
-type Mode = "chat" | "agent" | "team" | "workflow"; 
+export type ResponseMode = "agent" | "team" | "workflow";
 
-export const useHandleChat = (chatRoomId: string) => {
+export const useHandleChat = (chatRoomId: string, mode: ResponseMode) => {
   const abortController = useRef<AbortController | null>(null);
   const chatRoomExists = useChatStore((state) => state.chatRooms.some(room => room.id === chatRoomId));
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -269,6 +269,10 @@ const parseMessage = (message: string) => {
 
       const inputValue = inputRef?.current?.value?.trim() || '';
 
+      if (!inputValue) {
+        console.warn("Input value is empty, not starting task");
+        return;
+      }
 
       // add message locally
       addMessage({
@@ -278,7 +282,7 @@ const parseMessage = (message: string) => {
         content: inputValue
       }, chatRoomId);
 
-      const res = await fetch("http://localhost:8000/api/chat/completion", {
+      const res = await fetch(`http://localhost:8000/api/chat/completion/${mode}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -3,10 +3,11 @@
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button"; 
 import Icon from "@/components/icon";
-import { useHandleChat } from "@/hook/use-handle-chat";
+import { ResponseMode, useHandleChat } from "@/hook/use-handle-chat";
 import { useChatStore } from "@/store/chat-store";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import React from "react";
 
 export const TaskConfirmationRequest = ({ handleConfirm }: { handleConfirm: (value: boolean) => void }) => {
   // Subscribe to the entire chatRooms array to ensure re-renders
@@ -52,8 +53,13 @@ export const TaskConfirmationRequest = ({ handleConfirm }: { handleConfirm: (val
   );
 };
 
-const ChatInput = () => {
-  const { inputRef, startTask, cancelTask, handleConfirm, status } = useHandleChat("temp_chatRoomId");
+type ChatInputProps = {
+  chatRoomId: string;
+  mode: ResponseMode;
+};
+
+const ChatInput: React.FC<ChatInputProps> = ({ chatRoomId, mode }) => {
+  const { inputRef, startTask, cancelTask, handleConfirm, status } = useHandleChat(chatRoomId, mode);
 
   return (
     <div className="relative mx-auto mb-1 flex w-full max-w-2xl items-end justify-center gap-x-2 font-geist">

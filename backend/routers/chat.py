@@ -19,7 +19,7 @@ chat_router = APIRouter(prefix="/api/chat", tags=["chat"])
 session_manager = SessionManagerFactory.get_instance()
 ws_manager = WebSocketManagerFactory.get_instance()
 
-async def chat_completion(session_id: str, user_query: str): 
+async def agent_handler(session_id: str, user_query: str): 
     print(f"FROM ARGS: Starting simulated chat completion for session {session_id} with query: {user_query}")
     task = session_manager.get_task(session_id)
     if not task:
@@ -174,8 +174,17 @@ async def chat_completion(session_id: str, user_query: str):
         if session_manager.get_task(session_id):
             session_manager.cleanup_session(session_id)
 
-@chat_router.post("/completion")
-async def start_task(request: StartTaskRequest, background_tasks: BackgroundTasks):
+async def team_handler(session_id: str, user_query: str):
+    # Your team logic here
+    pass
+
+async def workflow_handler(session_id: str, user_query: str):
+    # Your workflow logic here
+    pass
+
+
+@chat_router.post("/completion/{handler_name}")
+async def start_task(request: StartTaskRequest, background_tasks: BackgroundTasks, handler_name: str):
     # Validate and sanitize the user query
     user_query = request.query.strip()
     if not user_query:
@@ -186,12 +195,22 @@ async def start_task(request: StartTaskRequest, background_tasks: BackgroundTask
     
     session_id, task = session_manager.create_session(user_query)
     print(f"Starting task for session {session_id} with query: {user_query}")
+
+    # define handler mapping
+    handler_map = {
+        "agent": agent_handler,
+        "team": team_handler,
+        "workflow": workflow_handler,
+    }
+    callback_handler = handler_map.get(handler_name)
+    if not callback_handler:
+        return JSONResponse(status_code=400, content={"error": f"Invalid handler name: {handler_name}"})
     
     # Don't start the background task immediately
     # Instead, wait for WebSocket connection to be established
     start_background_task(background_tasks, {
         "session_id": session_id,
-        "callback_fn": chat_completion,
+        "callback_fn": callback_handler,
         "callback_args": (session_id, user_query)
     })
     
