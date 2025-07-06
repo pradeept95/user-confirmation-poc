@@ -133,7 +133,7 @@ async def chat_completion(session_id: str, user_query: str):
                         raise Exception("Task cancelled by user.")
 
                     chunk_dist = run_response.to_dict()
-                    await ws_manager.send_json(session_id, {"type": "generating", "data": chunk_dist}, save_state=True)
+                    await ws_manager.send_json(session_id, {"type": "task_progress", "data": chunk_dist}, save_state=True)
 
             else: 
                 # Stream the response
@@ -148,7 +148,7 @@ async def chat_completion(session_id: str, user_query: str):
                             
                         # parse the chunk to a dictionary and send it 
                         chunk_dist = chunk.to_dict()
-                        await ws_manager.send_json(session_id, {"type": "generating", "data": chunk_dist}, save_state=True)
+                        await ws_manager.send_json(session_id, {"type": "task_progress", "data": chunk_dist}, save_state=True)
                 
         await ws_manager.send_json(session_id, {
             "type": "task_completed", 

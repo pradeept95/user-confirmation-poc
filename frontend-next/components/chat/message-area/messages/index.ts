@@ -1,3 +1,6 @@
-import Messages from "./chat-messages";
+import {
+  Messages,
+  StreamingMessages, 
+} from "./chat-messages";
 
-export default Messages;
+export { Messages, StreamingMessages };

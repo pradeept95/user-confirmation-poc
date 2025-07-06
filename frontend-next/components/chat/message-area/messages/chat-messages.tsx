@@ -13,6 +13,8 @@ import {
 import React, { type FC } from "react";
 import ChatBlankState from "./chat-blank-state";
 import Icon from "@/components/icon";
+import { useChatStore } from "@/store/chat-store";
+import { Button } from "@/components/ui/button";
 
 interface MessageListProps {
   messages: PlaygroundChatMessage[];
@@ -150,7 +152,23 @@ const ToolComponent = memo(({ tools }: ToolCallProps) => (
   </div>
 ));
 ToolComponent.displayName = "ToolComponent";
-const Messages = ({ messages }: MessageListProps) => {
+
+export const StreamingMessages = () => {
+  const streamingMessage = useChatStore((state) => state.chatRooms.find(room => room.id === "temp_chatRoomId")?.streamingMessage || null);
+
+  if (!streamingMessage) {
+    return null;
+  }
+
+  return (
+      <AgentMessageWrapper
+        message={streamingMessage}
+        isLastMessage={true}
+      />
+    );
+};
+
+export const Messages = ({ messages }: MessageListProps) => {
   if (messages.length === 0) {
     return <ChatBlankState />;
   }
@@ -174,6 +192,4 @@ const Messages = ({ messages }: MessageListProps) => {
       })}
     </>
   );
-};
-
-export default Messages;
+}; 
