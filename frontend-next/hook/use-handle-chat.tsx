@@ -1,4 +1,4 @@
-import { useChatStore } from "@/store/chat-store";
+import { ReasoningSteps, ToolCall, useChatStore } from "@/store/chat-store";
 import { useEffect, useRef, useState } from "react";
 
 type MessageTypes =
@@ -16,7 +16,7 @@ type MessageTypes =
 type Mode = "chat" | "agent" | "team" | "workflow"; 
 
 export const useHandleChat = (chatRoomId: string) => {
-  const abortController = useRef<AbortController>(null);
+  const abortController = useRef<AbortController | null>(null);
   const chatRoomExists = useChatStore((state) => state.chatRooms.some(room => room.id === chatRoomId));
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const setStatus = useChatStore((state) => state.setStatus);
@@ -33,6 +33,51 @@ export const useHandleChat = (chatRoomId: string) => {
 
   // streaming message response content
   const streamingMessageContent = useRef<string>("");
+  const toolCallRef = useRef<ToolCall[]>([]);
+  const reasoningStepsRef = useRef<ReasoningSteps[]>([]);
+
+   // Helper function to parse reasoning data from backend
+  const parseExtraData = (rawData: any) => {
+    if (!rawData) return {};
+
+    const extraData: any = {};
+
+    // Handle reasoning_messages array
+    if (rawData.reasoning_messages && Array.isArray(rawData.reasoning_messages)) {
+      extraData.reasoning_messages = rawData.reasoning_messages;
+      
+      // Extract reasoning_steps from reasoning_messages content
+      const reasoningSteps: any[] = [];
+      rawData.reasoning_messages.forEach((message: any) => {
+        if (message.content && typeof message.content === 'string') {
+          try {
+            const parsed = JSON.parse(message.content);
+            if (parsed.reasoning_steps && Array.isArray(parsed.reasoning_steps)) {
+              reasoningSteps.push(...parsed.reasoning_steps);
+            }
+          } catch (error) {
+            console.warn('Failed to parse reasoning message content:', error);
+          }
+        }
+      });
+      
+      if (reasoningSteps.length > 0) {
+        extraData.reasoning_steps = reasoningSteps;
+      }
+    }
+
+    // Handle direct reasoning_steps (if provided separately)
+    if (rawData.reasoning_steps && Array.isArray(rawData.reasoning_steps)) {
+      extraData.reasoning_steps = rawData.reasoning_steps;
+    }
+
+    // Handle references
+    if (rawData.references && Array.isArray(rawData.references)) {
+      extraData.references = rawData.references;
+    }
+
+    return extraData;
+  };
 
   // parse messages from the WebSocket
 const parseMessage = (message: string) => {
@@ -55,27 +100,67 @@ const parseMessage = (message: string) => {
     case "task_progress":
       // Handle task progress - this includes agent responses
       if (msg.data?.content && msg.data?.event === "RunCompleted") {
+        const processedExtraData = parseExtraData(msg.data.extra_data);
+        
         addMessage({
+          id: sessionId!,
           created_at: msg.data.created_at || Date.now(),
           role: 'agent',
-          content: msg.data.content,  
+          content: msg.data.content,
+          extra_data: {
+            ...processedExtraData,
+            reasoning_steps: reasoningStepsRef.current || [],
+            reasoning_messages: msg.data.extra_data?.reasoning_messages || [],
+          }, 
+          tool_calls: toolCallRef.current || [],
         }, chatRoomId);
-        
         // If this is a RunCompleted event, task is finished
         if (msg.data.event === "RunCompleted") {
           setStatus?.(chatRoomId, "idle");
+          updateStreamingMessage?.(chatRoomId, null);
+          streamingMessageContent.current = "";
+          toolCallRef.current = [];
+          reasoningStepsRef.current = []; 
         }
       }
       else if (msg.data?.content && msg.data?.event === "RunResponseContent") {
         streamingMessageContent.current += msg.data.content;
         updateStreamingMessage?.(chatRoomId, {
+          id: sessionId!,
           created_at: msg.data.created_at || Date.now(),
           role: 'agent',
           content: streamingMessageContent.current,
+          tool_calls: toolCallRef.current || [],
+          extra_data: {
+            reasoning_steps: reasoningStepsRef.current || [],
+            reasoning_messages: msg.data.extra_data?.reasoning_messages || [],
+          }
+
         });
       }
-
-
+      // tool call handling
+      else if (msg.data?.event === "ToolCallCompleted" && msg.data?.tool) {
+        // create tool call details and add to toolCallRef
+        const toolCall: ToolCall = { 
+          role: 'tool', 
+          tool_name: msg.data.tool.tool_name,
+          tool_call_id: msg.data.tool.tool_call_id,
+          content: msg.data.tool.result || "",
+          tool_args: msg.data.tool.tool_args || {},
+          tool_call_error: msg.data.tool.tool_call_error || false,
+          created_at: msg.data.tool.created_at || Date.now(),
+          metrics: msg.data.tool.metrics || null, 
+        };
+        toolCallRef.current.push(toolCall);
+      }
+      else if (msg.data?.event === "ReasoningCompleted" && Array.isArray(msg.data.content)) {
+        // create reasoning steps details and add to reasoningStepsRef
+        reasoningStepsRef.current.push(...msg.data.content);
+      }
+      else if (msg.data?.event === "ReasoningStep") {
+        // Handle reasoning messages
+        reasoningStepsRef.current.push(msg.data.content);
+      }
       break;
     case "task_completed":
       // Handle task completed
@@ -89,11 +174,19 @@ const parseMessage = (message: string) => {
       setStatus?.(chatRoomId, "error");
       socket?.close();
       break;
-    case "task_cancelled":
+    case "task_cancelled": 
       // Handle task cancelled
       setStatus?.(chatRoomId, "idle");
+      updateStreamingMessage?.(chatRoomId, null);
+      streamingMessageContent.current = "";
+      addMessage({
+        id: sessionId!,
+        created_at: Date.now(),
+        role: 'agent',
+        content: "Task was cancelled by user.",
+      }, chatRoomId);
       socket?.close();
-      break;
+      break; 
     case "request_user_input":
       // Handle user input request
       break;
@@ -179,6 +272,7 @@ const parseMessage = (message: string) => {
 
       // add message locally
       addMessage({
+        id: crypto.randomUUID(), // use sessionId if available, otherwise generate a new one
         created_at: Date.now(),
         role: 'user',
         content: inputValue
@@ -247,14 +341,34 @@ const parseMessage = (message: string) => {
     if (abortController.current) {
       abortController.current.abort();
     }
-    if (sessionId) {
-      await fetch(`http://localhost:8000/api/chat/cancel/${sessionId}`, {
-        method: "POST",
-      });
+    
+    // First, send cancel message through WebSocket if connected
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "cancel" }));
     }
-    if (socket) socket.send(JSON.stringify({ type: "cancel" }));
+    
+    // Then, call the HTTP cancel endpoint
+    if (sessionId) {
+      try {
+        await fetch(`http://localhost:8000/api/chat/cancel/${sessionId}`, {
+          method: "POST",
+        });
+        console.log("Task cancellation request sent successfully");
+
+      } catch (error) {
+        console.error("Error cancelling task:", error);
+      }
+    }
+    
+    // Update local state
     setStatus?.(chatRoomId, "idle");
-    // setTaskStatus("cancelled");
+    updateStreamingMessage?.(chatRoomId, null);
+    
+    // Close WebSocket connection
+    if (socket) {
+      socket.close();
+      setSocket(null);
+    }
   };
 
   const handleConfirm = (value: boolean) => {

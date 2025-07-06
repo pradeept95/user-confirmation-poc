@@ -15,6 +15,10 @@ import ChatBlankState from "./chat-blank-state";
 import Icon from "@/components/icon";
 import { useChatStore } from "@/store/chat-store";
 import { Button } from "@/components/ui/button";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import MarkdownRenderer from "@/components/typography/markdown-renderer";
+import { MorphingPopover, MorphingPopoverContent, MorphingPopoverTrigger } from "@/components/ui/morphing-popover";
+import { motion } from "framer-motion";
 
 interface MessageListProps {
   messages: PlaygroundChatMessage[];
@@ -73,7 +77,7 @@ const AgentMessageWrapper = ({ message }: MessageWrapperProps) => {
             >
               <Icon type="reasoning" size="sm" />
             </Tooltip>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 w-full">
               <p className="text-xs uppercase">Reasoning</p>
               <Reasonings reasoning={message.extra_data.reasoning_steps} />
             </div>
@@ -127,29 +131,70 @@ const AgentMessageWrapper = ({ message }: MessageWrapperProps) => {
   );
 };
 const Reasoning: FC<ReasoningStepProps> = ({ index, stepTitle }) => (
-  <div className="flex items-center gap-2 text-secondary">
+  <div className="flex items-center gap-2 text-secondary w-full">
     <div className="flex h-[20px] items-center rounded-md bg-background-secondary p-2">
       <p className="text-xs">STEP {index + 1}</p>
     </div>
     <p className="text-xs">{stepTitle}</p>
   </div>
 );
-const Reasonings: FC<ReasoningProps> = ({ reasoning }) => (
-  <div className="flex flex-col items-start justify-center gap-2">
-    {reasoning.map((title, index) => (
-      <Reasoning
-        key={`${title.title}-${title.action}-${index}`}
-        stepTitle={title.title}
-        index={index}
-      />
-    ))}
-  </div>
+const Reasonings: FC<ReasoningProps> = ({ reasoning }) => ( 
+    <Accordion
+      type="single"
+      collapsible
+      className="flex flex-col items-start justify-center gap-2 w-full" 
+    >
+      {reasoning.map((reasoning, index) => (
+      <AccordionItem value={reasoning.title + index} key={`${reasoning.title}-${reasoning.action}-${index}`} className="w-full border-none">
+        <AccordionTrigger className="w-full py-1">
+          <Reasoning
+            stepTitle={reasoning.title}
+            index={index}
+          /> 
+        </AccordionTrigger>
+        <AccordionContent className="flex flex-col gap-4 text-balance px-4 my-4"> 
+          <MarkdownRenderer>
+            {reasoning.reasoning}
+          </MarkdownRenderer>
+          <i>{reasoning.action}</i>
+        </AccordionContent>
+      </AccordionItem> 
+      ))}
+    </Accordion> 
 );
 
 const ToolComponent = memo(({ tools }: ToolCallProps) => (
-  <div className="cursor-default rounded-full bg-accent px-2 py-1.5 text-xs">
-    <p className="font-dmmono uppercase text-primary/80">{tools.tool_name}</p>
-  </div>
+  <MorphingPopover>
+      <MorphingPopoverTrigger asChild>
+        <Button variant='ghost' className="cursor-default rounded-full bg-accent px-2 py-1.5 text-xs uppercase"> 
+            {tools.tool_name}
+        </Button>
+      </MorphingPopoverTrigger>
+      <MorphingPopoverContent className="w-[400px] p-4 shadow-lg z-50 max-h-[400px] overflow-y-auto bg-background-secondary rounded-xl bg-muted">
+        <div className="mb-2">
+          <h4 className="text-sm font-semibold text-primary mb-1">Arguments</h4>
+          <div className="bg-muted p-2 rounded text-xs text-secondary whitespace-pre-wrap break-all">
+        {tools.tool_args && typeof tools.tool_args === "object" ? (
+          <pre>{JSON.stringify(tools.tool_args, null, 2)}</pre>
+        ) : (
+          <span>{tools.tool_args}</span>
+        )}
+          </div>
+          {tools.tool_args?.description && (
+        <p className="mt-2 text-xs text-accent">{tools.tool_args.description}</p>
+          )}
+        </div>
+        {tools.content && (
+          <div>
+        <h4 className="text-sm font-semibold text-primary mb-1">Tool Result</h4>
+        <div className="bg-background p-2 rounded text-xs text-secondary whitespace-pre-wrap break-all">
+          {tools.content}
+        </div>
+          </div>
+        )}
+      </MorphingPopoverContent>
+    </MorphingPopover>
+
 ));
 ToolComponent.displayName = "ToolComponent";
 

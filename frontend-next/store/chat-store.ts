@@ -81,6 +81,7 @@ export interface ResponseAudio {
 }
 
 export interface ChatMessage {
+  id: string; // use session id as message id
   role: "user" | "agent" | "system" | "tool";
   content: string;
   streamingError?: boolean;

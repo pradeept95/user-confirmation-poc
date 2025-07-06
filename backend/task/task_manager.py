@@ -26,6 +26,11 @@ async def wait_for_connection_and_start_task(task_info: dict):
         await asyncio.wait_for(task.websocket_ready.wait(), timeout=30.0)
         print(f"WebSocket ready for session {session_id}, starting task")
         
+        # Check if task was cancelled while waiting
+        if task.cancel_event.is_set():
+            print(f"Task {session_id} was cancelled while waiting for WebSocket")
+            return
+        
         # Additional small delay to ensure client is fully ready
         await asyncio.sleep(0.5)
         
@@ -38,10 +43,18 @@ async def wait_for_connection_and_start_task(task_info: dict):
     except asyncio.TimeoutError:
         print(f"Timeout waiting for WebSocket connection for session {session_id}")
         # Clean up session
-        session_manager.remove_session(session_id)
+        session_manager.cleanup_session(session_id)
         ws_manager.clear_session_state(session_id)
+    except asyncio.CancelledError:
+        print(f"Task {session_id} was cancelled during connection wait")
+        # Clean up session
+        session_manager.cleanup_session(session_id)
+        ws_manager.clear_session_state(session_id)
+        raise
     except Exception as e:
         print(f"Error waiting for connection or starting task for session {session_id}: {e}")
+        # Clean up session
+        session_manager.cleanup_session(session_id)
 
 async def request_user_input(session_id: str, fields):
     task = session_manager.get_task(session_id)

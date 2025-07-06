@@ -38,6 +38,7 @@ async def chat_completion(session_id: str, user_query: str):
         # Check if task was cancelled before starting
         if task.cancel_event.is_set():
             print(f"Task {session_id} was cancelled before starting")
+            await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
             return
 
         # response start 
@@ -48,7 +49,6 @@ async def chat_completion(session_id: str, user_query: str):
         }, save_state=True)
 
         agent = Agent(
-            # model=create_ollama_model("llama3.2:3b"),
             model=create_azure_openai_model(),
             name="Web Search Agent",
             description="An agent that performs web searches and retrieves information.",
@@ -76,30 +76,38 @@ async def chat_completion(session_id: str, user_query: str):
             markdown=True,
             debug_mode=True,
             reasoning=True
-            
         ) 
 
         # Initial async run with user's query
         for run_response in agent.run(user_query, stream=True, stream_intermediate_steps=True):
-            # Check for cancellation
+            # Check for cancellation at the start of each iteration
             if task.cancel_event.is_set(): 
+                print(f"Task {session_id} cancelled during agent run")
                 await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
-                return
+                return  # Clean return instead of raising exception
 
             # Handle paused states (confirmations, user input, etc.)
             if run_response.is_paused:
                 print(f"Task {session_id} is paused. Waiting for user input or confirmation...")
 
                 for tool in agent.run_response.tools_requiring_confirmation:
-                    # Ask for confirmation
-                    print(
-                        f"Tool name [bold blue]{tool.tool_name}({tool.tool_args})[/] requires confirmation."
-                    )
-                    # Handle confirmations, user input, or external tool execution
+                    # Check for cancellation before requesting confirmation
+                    if task.cancel_event.is_set():
+                        print(f"Task {session_id} cancelled during confirmation request")
+                        await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+                        return  # Clean return instead of raising exception
+
+                    print(f"Tool name [bold blue]{tool.tool_name}({tool.tool_args})[/] requires confirmation.")
                     confirmation_message = (
                         f"Agent is trying to access {tool.tool_name} with query {tool.tool_args}. Do you want to proceed?"
                     )
                     await request_confirmation(session_id, confirmation_message)
+
+                    # Check for cancellation after confirmation request
+                    if task.cancel_event.is_set():
+                        print(f"Task {session_id} cancelled during confirmation wait")
+                        await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+                        return  # Clean return instead of raising exception
 
                     if not task.confirmed:
                         tool.confirmed = False
@@ -108,29 +116,15 @@ async def chat_completion(session_id: str, user_query: str):
 
                 # continue the run after confirmation
                 run_response = agent.continue_run(stream=True)
-                
-
-                # if not task.confirmed:
-                #     for tool in run_response.tools_requiring_confirmation:
-                #         tool.confirmed = False
-                #     print(f"Task {session_id} not confirmed by user.")
-                #     await ws_manager.send_json(session_id, {"type": "task_not_confirmed", "content": "Task not confirmed by user."}, save_state=True)
-                #     return
-                # else:
-                #     for tool in run_response.tools_requiring_confirmation:  
-                #         tool.confirmed = True
-                #     print(f"Task {session_id} confirmed by user. Continuing run...")
-                 
 
             # check if run_response is RunResponseEvent event type
-            if  isinstance(run_response, RunResponseEvent): 
+            if isinstance(run_response, RunResponseEvent): 
                 if run_response.content is not None:
                     # Check for cancellation before sending
                     if task.cancel_event.is_set():
                         print(f"Task {session_id} was cancelled during streaming")
                         await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
-                        # throw cancellation exception
-                        raise Exception("Task cancelled by user.")
+                        return  # Clean return instead of raising exception
 
                     chunk_dist = run_response.to_dict()
                     await ws_manager.send_json(session_id, {"type": "task_progress", "data": chunk_dist}, save_state=True)
@@ -138,27 +132,47 @@ async def chat_completion(session_id: str, user_query: str):
             else: 
                 # Stream the response
                 for chunk in run_response:
+                    # Check for cancellation before each chunk
+                    if task.cancel_event.is_set():
+                        print(f"Task {session_id} was cancelled during chunk streaming")
+                        await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+                        return  # Clean return instead of raising exception
+
                     if chunk.content is not None:
-                        # Check for cancellation before sending
-                        if task.cancel_event.is_set():
-                            print(f"Task {session_id} was cancelled during streaming")
-                            await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
-                            # throw cancellation exception
-                            raise Exception("Task cancelled by user.") 
-                            
-                        # parse the chunk to a dictionary and send it 
                         chunk_dist = chunk.to_dict()
                         await ws_manager.send_json(session_id, {"type": "task_progress", "data": chunk_dist}, save_state=True)
                 
+        # Final check before completion
+        if task.cancel_event.is_set():
+            await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+            return  # Clean return instead of raising exception
+
         await ws_manager.send_json(session_id, {
             "type": "task_completed", 
             "content": f"AI task completed for query: '{user_query}'"
         }, save_state=True)
         
+    except asyncio.CancelledError:
+        # Handle proper asyncio cancellation
+        print(f"Task {session_id} was cancelled via asyncio.CancelledError")
+        await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+        raise  # Re-raise to properly handle cancellation
     except Exception as e:
-        print(f"Error during simulated chat completion for {session_id}: {e}")
-        await ws_manager.send_json(session_id, {"type": "task_failed", "error": str(e)}, save_state=True)
-
+        print(f"Error during chat completion for {session_id}: {e}")
+        # Check if it was a cancellation that caused the error
+        if task.cancel_event.is_set():
+            await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+        else:
+            await ws_manager.send_json(session_id, {"type": "task_failed", "error": str(e)}, save_state=True)
+    finally:
+        # Clean up task resources
+        if task.cancel_event.is_set():
+            print(f"Task {session_id} cleanup after cancellation")
+        else:
+            print(f"Task {session_id} cleanup after completion")
+        # Only cleanup if task still exists (might have been cleaned up by cancel endpoint)
+        if session_manager.get_task(session_id):
+            session_manager.cleanup_session(session_id)
 
 @chat_router.post("/completion")
 async def start_task(request: StartTaskRequest, background_tasks: BackgroundTasks):
@@ -188,9 +202,20 @@ async def start_task(request: StartTaskRequest, background_tasks: BackgroundTask
 async def cancel_task(session_id: str):
     task = session_manager.get_task(session_id)
     if task:
+        print(f"Cancelling task for session {session_id}")
         task.cancel_event.set()
-        return {"status": "cancelled"}
+        
+        # Send cancellation message through WebSocket if connected
+        if ws_manager.is_connected(session_id):
+            await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+        
+        # Clean up session after a short delay to allow message to be sent
+        await asyncio.sleep(0.1)
+        session_manager.cleanup_session(session_id)
+        
+        return {"status": "cancelled", "session_id": session_id}
     return JSONResponse(status_code=404, content={"error": "Session not found"})
+
 
 @chat_router.get("/session/{session_id}")
 async def get_session_info(session_id: str):

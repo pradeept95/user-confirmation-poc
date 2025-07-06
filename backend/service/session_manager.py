@@ -19,6 +19,17 @@ class SessionManager:
         if session_id in self.sessions:
             del self.sessions[session_id]
 
+    def cleanup_session(self, session_id: str): 
+        if session_id in self.sessions:
+            task = self.sessions[session_id]
+            # Cancel any pending operations
+            task.cancel_event.set()
+            # Remove from active sessions
+            del self.sessions[session_id]
+            print(f"Session {session_id} cleaned up")
+        else:
+            print(f"Session {session_id} not found for cleanup")
+
 
 class SessionManagerFactory:
     _instance = None
