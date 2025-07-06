@@ -14,11 +14,20 @@ import React, { type FC } from "react";
 import ChatBlankState from "./chat-blank-state";
 import Icon from "@/components/icon";
 import { useChatStore } from "@/store/chat-store";
-import { Button } from "@/components/ui/button";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import MarkdownRenderer from "@/components/typography/markdown-renderer";
-import { MorphingPopover, MorphingPopoverContent, MorphingPopoverTrigger } from "@/components/ui/morphing-popover";
-import { motion } from "framer-motion";
+import {
+  MorphingPopover,
+  MorphingPopoverContent,
+  MorphingPopoverTrigger,
+} from "@/components/ui/morphing-popover";
+import { Pill, PillStatus } from "@/components/ui/pill";
+import { CheckCircleIcon, MinusCircleIcon } from "lucide-react";
 
 interface MessageListProps {
   messages: PlaygroundChatMessage[];
@@ -138,79 +147,89 @@ const Reasoning: FC<ReasoningStepProps> = ({ index, stepTitle }) => (
     <p className="text-xs">{stepTitle}</p>
   </div>
 );
-const Reasonings: FC<ReasoningProps> = ({ reasoning }) => ( 
-    <Accordion
-      type="single"
-      collapsible
-      className="flex flex-col items-start justify-center gap-2 w-full" 
-    >
-      {reasoning.map((reasoning, index) => (
-      <AccordionItem value={reasoning.title + index} key={`${reasoning.title}-${reasoning.action}-${index}`} className="w-full border-none">
+const Reasonings: FC<ReasoningProps> = ({ reasoning }) => (
+  <Accordion
+    type="single"
+    collapsible
+    className="flex flex-col items-start justify-center gap-2 w-full"
+  >
+    {reasoning.map((reasoning, index) => (
+      <AccordionItem
+        value={reasoning.title + index}
+        key={`${reasoning.title}-${reasoning.action}-${index}`}
+        className="w-full border-none"
+      >
         <AccordionTrigger className="w-full py-1">
-          <Reasoning
-            stepTitle={reasoning.title}
-            index={index}
-          /> 
+          <Reasoning stepTitle={reasoning.title} index={index} />
         </AccordionTrigger>
-        <AccordionContent className="flex flex-col gap-4 text-balance px-4 my-4"> 
-          <MarkdownRenderer>
-            {reasoning.reasoning}
-          </MarkdownRenderer>
+        <AccordionContent className="flex flex-col gap-4 text-balance px-4 my-4">
+          <MarkdownRenderer>{reasoning.reasoning}</MarkdownRenderer>
           <i>{reasoning.action}</i>
         </AccordionContent>
-      </AccordionItem> 
-      ))}
-    </Accordion> 
+      </AccordionItem>
+    ))}
+  </Accordion>
 );
 
 const ToolComponent = memo(({ tools }: ToolCallProps) => (
   <MorphingPopover>
-      <MorphingPopoverTrigger asChild>
-        <Button variant='ghost' className="cursor-default rounded-full bg-accent px-2 py-1.5 text-xs uppercase"> 
-            {tools.tool_name}
-        </Button>
-      </MorphingPopoverTrigger>
-      <MorphingPopoverContent className="w-[400px] p-4 shadow-lg z-50 max-h-[400px] overflow-y-auto bg-background-secondary rounded-xl bg-muted">
-        <div className="mb-2">
-          <h4 className="text-sm font-semibold text-primary mb-1">Arguments</h4>
-          <div className="bg-muted p-2 rounded text-xs text-secondary whitespace-pre-wrap break-all">
-        {tools.tool_args && typeof tools.tool_args === "object" ? (
-          <pre>{JSON.stringify(tools.tool_args, null, 2)}</pre>
-        ) : (
-          <span>{tools.tool_args}</span>
-        )}
-          </div>
-          {tools.tool_args?.description && (
-        <p className="mt-2 text-xs text-accent">{tools.tool_args.description}</p>
+    <MorphingPopoverTrigger> 
+        <Pill variant={"outline"} className="uppercase">
+          <PillStatus>
+            {(tools?.tool_call_error ? (
+              <MinusCircleIcon size={12} className="text-rose-500" />
+            ) : (
+              <CheckCircleIcon size={12} className="text-emerald-500" />
+            ))}
+          </PillStatus>
+          {tools.tool_name}
+        </Pill> 
+    </MorphingPopoverTrigger>
+    <MorphingPopoverContent className="w-[400px] p-4 shadow-lg z-50 max-h-[400px] overflow-y-auto bg-background-secondary rounded-xl bg-muted">
+      <div className="mb-2">
+        <h4 className="text-sm font-semibold text-primary mb-1">Arguments</h4>
+        <div className="bg-muted p-2 rounded text-xs text-secondary whitespace-pre-wrap break-all">
+          {tools.tool_args && typeof tools.tool_args === "object" ? (
+            <pre>{JSON.stringify(tools.tool_args, null, 2)}</pre>
+          ) : (
+            <span>{tools.tool_args}</span>
           )}
         </div>
-        {tools.content && (
-          <div>
-        <h4 className="text-sm font-semibold text-primary mb-1">Tool Result</h4>
-        <div className="bg-background p-2 rounded text-xs text-secondary whitespace-pre-wrap break-all">
-          {tools.content}
-        </div>
-          </div>
+        {tools.tool_args?.description && (
+          <p className="mt-2 text-xs text-accent">
+            {tools.tool_args.description}
+          </p>
         )}
-      </MorphingPopoverContent>
-    </MorphingPopover>
-
+      </div>
+      {tools.content && (
+        <div>
+          <h4 className="text-sm font-semibold text-primary mb-1">
+            Tool Result
+          </h4>
+          <div className="bg-background p-2 rounded text-xs text-secondary whitespace-pre-wrap break-all">
+            {tools.content}
+          </div>
+        </div>
+      )}
+    </MorphingPopoverContent>
+  </MorphingPopover>
 ));
 ToolComponent.displayName = "ToolComponent";
 
 export const StreamingMessages = () => {
-  const streamingMessage = useChatStore((state) => state.chatRooms.find(room => room.id === "temp_chatRoomId")?.streamingMessage || null);
+  const streamingMessage = useChatStore(
+    (state) =>
+      state.chatRooms.find((room) => room.id === "temp_chatRoomId")
+        ?.streamingMessage || null
+  );
 
   if (!streamingMessage) {
     return null;
   }
 
   return (
-      <AgentMessageWrapper
-        message={streamingMessage}
-        isLastMessage={true}
-      />
-    );
+    <AgentMessageWrapper message={streamingMessage} isLastMessage={true} />
+  );
 };
 
 export const Messages = ({ messages }: MessageListProps) => {
@@ -237,4 +256,4 @@ export const Messages = ({ messages }: MessageListProps) => {
       })}
     </>
   );
-}; 
+};

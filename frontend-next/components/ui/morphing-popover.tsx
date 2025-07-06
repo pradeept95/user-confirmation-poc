@@ -79,7 +79,7 @@ export type MorphingPopoverProps = {
 
 function MorphingPopover({
   children,
-  transition = TRANSITION,
+  transition = TRANSITION as Transition,
   defaultOpen,
   open,
   onOpenChange,
@@ -125,6 +125,7 @@ function MorphingPopoverTrigger({
 
   if (asChild && isValidElement(children)) {
     const MotionComponent = motion.create(
+      /* eslint-disable-next-line */
       children.type as React.ForwardRefExoticComponent<any>
     );
     const childProps = children.props as Record<string, unknown>;
@@ -178,7 +179,7 @@ function MorphingPopoverContent({
       'MorphingPopoverContent must be used within MorphingPopover'
     );
 
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement | null>(null);
   useClickOutside(ref, context.close);
 
   useEffect(() => {
