@@ -779,7 +779,7 @@ const Img = ({ src, alt }: ImgProps) => {
 };
 
 const Table = ({ className, ...props }: TableProps) => (
-  <div className="w-full max-w-[560px] overflow-hidden rounded-md border border-border">
+  <div className="w-full max-w-[700px] overflow-hidden rounded-md border border-border">
     <div className="w-full overflow-x-auto">
       <table className={cn(className, "w-full")} {...filterProps(props)} />
     </div>
