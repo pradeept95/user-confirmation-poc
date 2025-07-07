@@ -137,12 +137,24 @@ export const useChatStore = create<ChatStore>()(
     (set) => ({
       chatRooms: [
         {
-          id: "temp_chatRoomId",
-          name: "Chat Room 1",
+          id: "temp_agent_id",
+          name: "Agent Chat Room",
           messages: [],
           streamingMessage: null,
           status: "idle",
-        },
+        },{
+          id: "temp_team_id",
+          name: "Team Chat Room",
+          messages: [],
+          streamingMessage: null,
+          status: "idle",
+        },{
+          id: "temp_workflow_id",
+          name: "Workflow Chat Room",
+          messages: [],
+          streamingMessage: null,
+          status: "idle",
+        }
       ],
       addMessage: (message, roomId) =>
         set((state) => {

@@ -4,12 +4,18 @@ import {Messages, StreamingMessages} from "./messages";
 import { StickToBottom } from "use-stick-to-bottom";
 import ScrollToBottom from "./scroll-to-bottom";
 import { useChatStore } from "@/store/chat-store";
+import { ResponseMode } from "@/hook/use-handle-chat";
+
+type MessageAreaProps = {
+    chatRoomId: string;
+    mode: ResponseMode;
+};
 
 
-const MessageArea = () => {
+const MessageArea: React.FC<MessageAreaProps> = ({ chatRoomId }) => {
   // Subscribe to the entire chatRooms array to ensure re-renders
   const chatRooms = useChatStore((state) => state.chatRooms);
-  const messages = chatRooms?.find(room => room.id === "temp_chatRoomId")?.messages || [];
+  const messages = chatRooms?.find(room => room.id === chatRoomId)?.messages || [];
 
   return (
     <StickToBottom

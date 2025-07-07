@@ -219,7 +219,7 @@ ToolComponent.displayName = "ToolComponent";
 export const StreamingMessages = () => {
   const streamingMessage = useChatStore(
     (state) =>
-      state.chatRooms.find((room) => room.id === "temp_chatRoomId")
+      state.chatRooms.find((room) => room.id === "temp_agent_id")
         ?.streamingMessage || null
   );
 

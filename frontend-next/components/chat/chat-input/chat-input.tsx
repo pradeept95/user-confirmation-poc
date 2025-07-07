@@ -12,7 +12,7 @@ import React from "react";
 export const TaskConfirmationRequest = ({ handleConfirm }: { handleConfirm: (value: boolean) => void }) => {
   // Subscribe to the entire chatRooms array to ensure re-renders
   const chatRooms = useChatStore((state) => state.chatRooms);
-  const confirmationRequests = chatRooms?.find(room => room.id === "temp_chatRoomId")?.confirmationRequests || [];
+  const confirmationRequests = chatRooms?.find(room => room.id === "temp_agent_id")?.confirmationRequests || [];
 
   if (!confirmationRequests || confirmationRequests.length === 0) {
     return null;

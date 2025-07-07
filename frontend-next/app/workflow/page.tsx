@@ -9,7 +9,7 @@ const WorkflowPage = () => {
     <Suspense fallback={<div>Loading...</div>}>
       <div className="flex h-screen bg-background/80">
         <main className="relative m-1.5 flex flex-grow flex-col rounded-xl bg-background">
-          <MessageArea />
+          <MessageArea chatRoomId="temp_workflow_id" mode="workflow" />
           <div className="sticky bottom-0 ml-9 px-4 pb-2">
             <ChatInput chatRoomId="temp_workflow_id" mode="workflow" />
           </div>
