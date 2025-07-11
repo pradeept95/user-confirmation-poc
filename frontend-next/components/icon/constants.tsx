@@ -11,7 +11,6 @@ import {
   CohereLogo,
   OllamaLogo,
   XaiLogo,
-  AgnoIcon,
   UserIcon,
   AgentIcon,
   SheetIcon,
@@ -20,9 +19,9 @@ import {
   TailwindTag,
   AgnoTag,
   ReasoningIcon,
-  ReferencesIcon
-} from './custom-icons'
-import { IconTypeMap } from './types'
+  ReferencesIcon,
+} from "./custom-icons";
+import { IconTypeMap } from "./types";
 import {
   RefreshCw,
   Edit,
@@ -36,13 +35,13 @@ import {
   ChevronDown,
   ChevronUp,
   Trash,
-  StopCircle
-} from 'lucide-react'
+  StopCircle,
+} from "lucide-react";
 
-import { PlusIcon } from '@radix-ui/react-icons'
+import { PlusIcon } from "@radix-ui/react-icons";
 
 export const ICONS: IconTypeMap = {
-  'open-ai': OpenAILogo,
+  "open-ai": OpenAILogo,
   mistral: MistralLogo,
   gemini: GeminiLogo,
   aws: AwsLogo,
@@ -54,7 +53,6 @@ export const ICONS: IconTypeMap = {
   cohere: CohereLogo,
   ollama: OllamaLogo,
   xai: XaiLogo,
-  agno: AgnoIcon,
   user: UserIcon,
   agent: AgentIcon,
   sheet: SheetIcon,
@@ -62,20 +60,20 @@ export const ICONS: IconTypeMap = {
   shadcn: ShadcnTag,
   tailwind: TailwindTag,
   reasoning: ReasoningIcon,
-  'agno-tag': AgnoTag,
+  "agno-tag": AgnoTag,
   refresh: RefreshCw,
   edit: Edit,
   save: Save,
   x: X,
-  'arrow-down': ArrowDown,
+  "arrow-down": ArrowDown,
   send: SendIcon,
   download: Download,
   hammer: HammerIcon,
   check: Check,
-  'chevron-down': ChevronDown,
-  'chevron-up': ChevronUp,
-  'plus-icon': PlusIcon,
+  "chevron-down": ChevronDown,
+  "chevron-up": ChevronUp,
+  "plus-icon": PlusIcon,
   references: ReferencesIcon,
   trash: Trash,
-  cancel: StopCircle
+  cancel: StopCircle,
 };

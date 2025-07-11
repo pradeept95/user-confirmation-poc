@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/morphing-popover";
 import { Pill, PillStatus } from "@/components/ui/pill";
 import { CheckCircleIcon, MinusCircleIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface MessageListProps {
   messages: PlaygroundChatMessage[];
@@ -116,7 +117,7 @@ const AgentMessageWrapper = ({ message }: MessageWrapperProps) => {
           >
             <Icon
               type="hammer"
-              className="rounded-lg bg-background-secondary p-1"
+              className="rounded-sm bg-emerald-200 p-1"
               size="sm"
               color="secondary"
             />
@@ -136,6 +137,15 @@ const AgentMessageWrapper = ({ message }: MessageWrapperProps) => {
         </div>
       )}
       <AgentMessage message={message} />
+
+      {/* Display the timestamp if it exists */}
+      {Boolean(message.created_at) && (
+        <div className="px-10 text-xs text-secondary">
+          {new Date(message.created_at).toLocaleString()}
+        </div>
+      )}
+
+      {/* chat actions */}
     </div>
   );
 };
@@ -164,7 +174,12 @@ const Reasonings: FC<ReasoningProps> = ({ reasoning }) => (
         </AccordionTrigger>
         <AccordionContent className="flex flex-col gap-4 text-balance px-4 my-4">
           <MarkdownRenderer>{reasoning.reasoning}</MarkdownRenderer>
-          <i>{reasoning.action}</i>
+          <i>
+            <Badge className="block" variant={"outline"}>
+              Action
+            </Badge>
+            {reasoning.action}
+          </i>
         </AccordionContent>
       </AccordionItem>
     ))}
@@ -173,17 +188,17 @@ const Reasonings: FC<ReasoningProps> = ({ reasoning }) => (
 
 const ToolComponent = memo(({ tools }: ToolCallProps) => (
   <MorphingPopover>
-    <MorphingPopoverTrigger> 
-        <Pill variant={"outline"} className="uppercase">
-          <PillStatus>
-            {(tools?.tool_call_error ? (
-              <MinusCircleIcon size={12} className="text-rose-500" />
-            ) : (
-              <CheckCircleIcon size={12} className="text-emerald-500" />
-            ))}
-          </PillStatus>
-          {tools.tool_name}
-        </Pill> 
+    <MorphingPopoverTrigger>
+      <Pill variant={"outline"} className="uppercase">
+        <PillStatus>
+          {tools?.tool_call_error ? (
+            <MinusCircleIcon size={12} className="text-rose-500" />
+          ) : (
+            <CheckCircleIcon size={12} className="text-emerald-500" />
+          )}
+        </PillStatus>
+        {tools.tool_name}
+      </Pill>
     </MorphingPopoverTrigger>
     <MorphingPopoverContent className="w-[400px] p-4 shadow-lg z-50 max-h-[400px] overflow-y-auto bg-background-secondary rounded-xl bg-muted">
       <div className="mb-2">

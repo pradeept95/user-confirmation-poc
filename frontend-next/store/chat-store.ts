@@ -105,7 +105,7 @@ export type ConfirmationRequest = {
 
 type ChatRoom = {
   id: string;
-  name: string; 
+  name: string;
   messages: ChatMessage[];
   streamingMessage: ChatMessage | null;
 
@@ -129,7 +129,6 @@ type ChatStore = {
     confirmationRequestId: string
   ) => void;
   clearConfirmationRequests?: (roomId: string) => void;
-
 };
 
 export const useChatStore = create<ChatStore>()(
@@ -142,19 +141,21 @@ export const useChatStore = create<ChatStore>()(
           messages: [],
           streamingMessage: null,
           status: "idle",
-        },{
+        },
+        {
           id: "temp_team_id",
           name: "Team Chat Room",
           messages: [],
           streamingMessage: null,
           status: "idle",
-        },{
+        },
+        {
           id: "temp_workflow_id",
           name: "Workflow Chat Room",
           messages: [],
           streamingMessage: null,
           status: "idle",
-        }
+        },
       ],
       addMessage: (message, roomId) =>
         set((state) => {
@@ -171,7 +172,7 @@ export const useChatStore = create<ChatStore>()(
           if (room && message) {
             room.streamingMessage = message;
           } else {
-            room ? room.streamingMessage = null : null;
+            room ? (room.streamingMessage = null) : null;
           }
           return { chatRooms: [...state.chatRooms] };
         }),

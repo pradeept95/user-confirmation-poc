@@ -1,31 +1,4 @@
-import { type FC } from 'react'
-
-export const AgnoIcon: FC = ({ ...props }) => {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      {...props}
-    >
-      <g clipPath="url(#clip0_2815_4632)">
-        <path
-          fillRule="evenodd"
-          clipRule="evenodd"
-          d="M15.7469 1.84196C16.0957 2.52647 16.0957 3.42256 16.0957 5.21473V10.9752C16.0957 12.7674 16.0957 13.6634 15.7469 14.348C15.4401 14.9501 14.9506 15.4396 14.3485 15.7464C13.6639 16.0952 12.7679 16.0952 10.9757 16.0952H5.21522C3.42305 16.0952 2.52696 16.0952 1.84245 15.7464C1.24033 15.4396 0.750789 14.9501 0.443994 14.348C0.0952148 13.6634 0.0952148 12.7674 0.0952148 10.9752V5.21473C0.0952148 3.42256 0.0952148 2.52647 0.443994 1.84196C0.750789 1.23984 1.24033 0.7503 1.84245 0.443506C2.52696 0.0947266 3.42305 0.0947266 5.21521 0.0947266H10.9757C12.7678 0.0947266 13.6639 0.0947266 14.3485 0.443506C14.9506 0.7503 15.4401 1.23984 15.7469 1.84196ZM5.27398 3.77524H9.3046L12.594 12.0905H10.9168L8.32056 5.18973H5.27398V3.77524ZM2.99402 10.676H7.12113V12.0905H2.99402V10.676Z"
-          fill="#FF4017"
-        />
-      </g>
-      <defs>
-        <clipPath id="clip0_2815_4632">
-          <rect width="16" height="16" fill="white" />
-        </clipPath>
-      </defs>
-    </svg>
-  )
-}
+import { type FC } from "react";
 
 export const UserIcon: FC = ({ ...props }) => {
   return (
@@ -37,7 +10,7 @@ export const UserIcon: FC = ({ ...props }) => {
       xmlns="http://www.w3.org/2000/svg"
       {...props}
     >
-      <rect width="16" height="16" rx="4" fill="#FAFAFA" />
+      <rect width="16" height="16" rx="4" fill="#548235" />
       <path
         d="M11.5 12.5V11.5C11.5 10.9696 11.2893 10.4609 10.9142 10.0858C10.5391 9.71071 10.0304 9.5 9.5 9.5H6.5C5.96957 9.5 5.46086 9.71071 5.08579 10.0858C4.71071 10.4609 4.5 10.9696 4.5 11.5V12.5M10 5.5C10 6.60457 9.10457 7.5 8 7.5C6.89543 7.5 6 6.60457 6 5.5C6 4.39543 6.89543 3.5 8 3.5C9.10457 3.5 10 4.39543 10 5.5Z"
         stroke="#18181B"
@@ -46,8 +19,8 @@ export const UserIcon: FC = ({ ...props }) => {
         strokeLinejoin="round"
       />
     </svg>
-  )
-}
+  );
+};
 
 export const AgentIcon: FC = ({ ...props }) => {
   return (
@@ -59,7 +32,7 @@ export const AgentIcon: FC = ({ ...props }) => {
       xmlns="http://www.w3.org/2000/svg"
       {...props}
     >
-      <rect width="16" height="16" rx="4" fill="#FF4017" />
+      <rect width="16" height="16" rx="4" fill="#505496" />
       <path
         fillRule="evenodd"
         clipRule="evenodd"
@@ -93,8 +66,8 @@ export const AgentIcon: FC = ({ ...props }) => {
         fill="white"
       />
     </svg>
-  )
-}
+  );
+};
 
 export const MistralLogo: FC = ({ ...props }) => (
   <svg
@@ -214,7 +187,7 @@ export const MistralLogo: FC = ({ ...props }) => (
       fill="#FAFAFA"
     />
   </svg>
-)
+);
 
 export const GeminiLogo: FC = () => (
   <svg
@@ -229,7 +202,7 @@ export const GeminiLogo: FC = () => (
       fill="#FAFAFA"
     />
   </svg>
-)
+);
 
 export const AwsLogo: FC = ({ ...props }) => (
   <svg
@@ -264,7 +237,7 @@ export const AwsLogo: FC = ({ ...props }) => (
       </clipPath>
     </defs>
   </svg>
-)
+);
 
 export const AnthropicLogo: FC = ({ ...props }) => (
   <svg
@@ -287,7 +260,7 @@ export const AnthropicLogo: FC = ({ ...props }) => (
       </clipPath>
     </defs>
   </svg>
-)
+);
 
 export const OllamaLogo: FC = ({ ...props }) => (
   <svg
@@ -321,7 +294,7 @@ export const OllamaLogo: FC = ({ ...props }) => (
       fill="#FAFAFA"
     />
   </svg>
-)
+);
 
 export const GroqLogo: FC = ({ ...props }) => (
   <svg
@@ -337,7 +310,7 @@ export const GroqLogo: FC = ({ ...props }) => (
       fill="#FAFAFA"
     />
   </svg>
-)
+);
 export const DeepseekLogo: FC = ({ ...props }) => (
   <svg
     width="20"
@@ -352,7 +325,7 @@ export const DeepseekLogo: FC = ({ ...props }) => (
       fill="#FAFAFA"
     />
   </svg>
-)
+);
 
 export const CohereLogo: FC = ({ ...props }) => (
   <svg
@@ -380,7 +353,7 @@ export const CohereLogo: FC = ({ ...props }) => (
       fill="#FAFAFA"
     />
   </svg>
-)
+);
 export const FireworksLogo: FC = ({ ...props }) => (
   <svg
     width="22"
@@ -397,7 +370,7 @@ export const FireworksLogo: FC = ({ ...props }) => (
       fill="#FAFAFA"
     />
   </svg>
-)
+);
 
 export const AzureLogo: FC = ({ ...props }) => (
   <svg
@@ -413,7 +386,7 @@ export const AzureLogo: FC = ({ ...props }) => (
       fill="#FAFAFA"
     />
   </svg>
-)
+);
 export const XaiLogo: FC = ({ ...props }) => (
   <svg
     width="22"
@@ -440,7 +413,7 @@ export const XaiLogo: FC = ({ ...props }) => (
       fill="#FAFAFA"
     />
   </svg>
-)
+);
 export const OpenAILogo: FC = ({ ...props }) => (
   <svg
     width="22"
@@ -455,7 +428,7 @@ export const OpenAILogo: FC = ({ ...props }) => (
       fill="#FAFAFA"
     />
   </svg>
-)
+);
 
 export const SheetIcon: FC = ({ ...props }) => (
   <svg
@@ -473,7 +446,7 @@ export const SheetIcon: FC = ({ ...props }) => (
       strokeLinejoin="round"
     />
   </svg>
-)
+);
 
 export const NextjsTag: FC = ({ ...props }) => (
   <svg
@@ -583,7 +556,7 @@ export const NextjsTag: FC = ({ ...props }) => (
       </clipPath>
     </defs>
   </svg>
-)
+);
 
 export const ShadcnTag: FC = ({ ...props }) => (
   <svg
@@ -702,7 +675,7 @@ export const ShadcnTag: FC = ({ ...props }) => (
       />
     </defs>
   </svg>
-)
+);
 
 export const TailwindTag: FC = ({ ...props }) => (
   <svg
@@ -815,7 +788,7 @@ export const TailwindTag: FC = ({ ...props }) => (
       </filter>
     </defs>
   </svg>
-)
+);
 
 export const AgnoTag: FC = ({ ...props }) => {
   return (
@@ -927,8 +900,8 @@ export const AgnoTag: FC = ({ ...props }) => {
         </clipPath>
       </defs>
     </svg>
-  )
-}
+  );
+};
 
 export const ReasoningIcon: FC = ({ ...props }) => (
   <svg
@@ -954,7 +927,7 @@ export const ReasoningIcon: FC = ({ ...props }) => (
       </clipPath>
     </defs>
   </svg>
-)
+);
 
 export const ReferencesIcon: FC = ({ ...props }) => (
   <svg
@@ -980,4 +953,4 @@ export const ReferencesIcon: FC = ({ ...props }) => (
       </clipPath>
     </defs>
   </svg>
-)
+);

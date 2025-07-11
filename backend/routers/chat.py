@@ -63,12 +63,12 @@ async def agent_handler(session_id: str, user_query: str):
             tools=[
                 GoogleSearchTools(requires_confirmation_tools=["google_search"]), 
                 DuckDuckGoTools(requires_confirmation_tools=["duckduckgo_search"]),
-                # ReasoningTools(
-                #     think=True,
-                #     analyze=True,
-                #     add_instructions=True,
-                #     add_few_shot=True,
-                # )
+                ReasoningTools(
+                    think=True,
+                    analyze=True,
+                    add_instructions=True,
+                    add_few_shot=True,
+                )
             ],
             resolve_context=False,
             add_datetime_to_instructions=True,
@@ -76,7 +76,7 @@ async def agent_handler(session_id: str, user_query: str):
             show_tool_calls=True,
             markdown=True,
             debug_mode=True,
-            # reasoning=True
+            reasoning=True
         ) 
 
         # Initial async run with user's query
