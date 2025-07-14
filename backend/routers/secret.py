@@ -33,7 +33,7 @@ async def add_secret(request: SecretCreateRequest):
     
 
 # get single key value
-@secret_router.get("/all")
+@secret_router.get("/get-all")
 async def get_all_secrets():
     try:
         secrets = client.list_properties_of_secrets()
@@ -46,8 +46,8 @@ async def get_all_secrets():
         raise HTTPException(status_code=500, detail=str(e))
 
 # get single key value
-@secret_router.get("/key/{key}")
-async def get_secret(key: str):
+@secret_router.get("/get-value/{key}")
+async def get_secret(key: str) -> SecretCreateRequest:
     try:
         secret = client.get_secret(key)
         return {"key": key, "value": secret.value}
