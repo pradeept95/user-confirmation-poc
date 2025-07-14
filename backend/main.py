@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 # routers
 from routers.websocket import ws_router
 from routers.chat import chat_router
+from routers.secret import secret_router
+
 
 # ws_manager = WebSocketManagerFactory.get_instance()
 # session_manager = SessionManagerFactory.get_instance()
@@ -22,6 +24,7 @@ app.add_middleware(
 # Include routers
 app.include_router(ws_router)
 app.include_router(chat_router)
+app.include_router(secret_router)
 
 # async def long_running_task(session_id: str):
 #     task = session_manager.get_task(session_id)

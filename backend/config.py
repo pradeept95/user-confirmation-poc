@@ -33,3 +33,7 @@ def create_ollama_model(model_name: str):
         host="http://10.1.10.247:11434",
         id=model_name
     )
+
+
+
+
