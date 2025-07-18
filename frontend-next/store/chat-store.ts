@@ -103,6 +103,13 @@ export type ConfirmationRequest = {
   message: string;
 };
 
+export type UserInputRequest = {
+  name: string;
+  description: string;
+  type: "string" | "number" | "boolean";
+  value: string | number | boolean | null;
+};
+
 type ChatRoom = {
   id: string;
   name: string;
@@ -111,6 +118,7 @@ type ChatRoom = {
 
   // for confirmation
   confirmationRequests?: ConfirmationRequest[];
+  userInputRequests?: UserInputRequest[];
 
   status: "idle" | "loading" | "error";
 };
@@ -128,6 +136,8 @@ type ChatStore = {
     roomId: string,
     confirmationRequestId: string
   ) => void;
+  setUserInputRequest?: (roomId: string, request: UserInputRequest[]) => void;
+  clearUserInputRequests?: (roomId: string) => void;
   clearConfirmationRequests?: (roomId: string) => void;
 };
 
@@ -205,6 +215,26 @@ export const useChatStore = create<ChatStore>()(
           const room = state.chatRooms.find((room) => room.id === roomId);
           if (room) {
             room.confirmationRequests = [];
+          }
+          return { chatRooms: [...state.chatRooms] };
+        }),
+
+      setUserInputRequest: (roomId, requests) =>
+        set((state) => {
+          const room = state.chatRooms.find((room) => room.id === roomId);
+          console.log("Setting user input requests:", requests, room);
+          if (room) {
+            room.userInputRequests = room.userInputRequests || [];
+            room.userInputRequests.push(...requests);
+          }
+          return { chatRooms: [...state.chatRooms] };
+        }),
+
+      clearUserInputRequests: (roomId) =>
+        set((state) => {
+          const room = state.chatRooms.find((room) => room.id === roomId);
+          if (room) {
+            room.userInputRequests = [];
           }
           return { chatRooms: [...state.chatRooms] };
         }),

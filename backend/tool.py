@@ -35,25 +35,8 @@ def get_top_hackernews_stories(num_stories: int) -> Iterator[str]:
     return json.dumps(final_stories)
 
 
-async def get_user_input_async(session_id: str, fields: list[dict]) -> str:
-   
-    print(f"Requesting user input for session {session_id} with fields: {fields}")
-    await request_user_input(session_id, fields)
-    task = session_manager.get_task(session_id)
-    if not task.input_request or not task.input_request.values:
-        print(f"Task {session_id} cancelled or no input.")
-        return
-
-    print(f"Task {session_id} received input: {task.input_request.values}")
-
-    # return user input as JSON string
-    return json.dumps(task.input_request.values)
-
-
-# return sync version of get_user_input 
-@tool()
-def get_user_input(session_id: str, fields: list[dict]) -> str:
-    """If agent needs to ask the user for input, this function can be used.
+async def get_user_input(session_id: str, fields: list[dict]) -> str:
+    """If agent needs to ask the user for input, this function can be used. You can specify the multiple fields to request from the user.
     Example fields format:
         ```python
         fields = [
@@ -74,24 +57,15 @@ def get_user_input(session_id: str, fields: list[dict]) -> str:
     Returns:
         str: user response or None if cancelled
     """
-    import asyncio
-
     print(f"Requesting user input for session {session_id} with fields: {fields}")
-    
-    # Get the current event loop instead of creating a new one
-    try:
-        loop = asyncio.get_running_loop()
-        # Create a task to run the async function
-        task = loop.create_task(get_user_input_async(session_id, fields))
-        
-        # Wait for the task to complete synchronously
-        # This will block until the async function finishes
-        while not task.done():
-            loop._run_once()
-            
-        result = task.result()
-        return result
-    except RuntimeError:
-        # Fallback if no event loop is running (shouldn't happen in FastAPI context)
-        result = asyncio.run(get_user_input_async(session_id, fields))
-        return result
+    await request_user_input(session_id, fields)
+    task = session_manager.get_task(session_id)
+    if not task.input_request or not task.input_request.values:
+        print(f"Task {session_id} cancelled or no input.")
+        return
+
+    print(f"Task {session_id} received input: {task.input_request.values}")
+
+    # return user input as JSON string
+    return json.dumps(task.input_request.values)
+ 

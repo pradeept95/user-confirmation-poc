@@ -31,11 +31,21 @@ export const useHandleChat = (chatRoomId: string, mode: ResponseMode) => {
     (state) => state.updateStreamingMessage
   );
 
+  // for confirmation requests
   const setConfirmationRequest = useChatStore(
     (state) => state.setConfirmationRequest
   );
   const clearConfirmationRequests = useChatStore(
     (state) => state.clearConfirmationRequests
+  );
+
+  // for user input requests
+
+  const setUserInputRequest = useChatStore(
+    (state) => state.setUserInputRequest
+  );
+  const clearUserInputRequests = useChatStore(
+    (state) => state.clearUserInputRequests
   );
 
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -214,6 +224,10 @@ export const useHandleChat = (chatRoomId: string, mode: ResponseMode) => {
         break;
       case "request_user_input":
         // Handle user input request
+        console.log("User input request received:", msg);
+        if (msg && msg.fields) {
+          setUserInputRequest?.(chatRoomId, msg.fields);
+        }
         break;
       case "request_confirmation":
         // Handle confirmation request
@@ -417,5 +431,20 @@ export const useHandleChat = (chatRoomId: string, mode: ResponseMode) => {
     // if (!value) setTaskStatus("not confirmed");
   };
 
-  return { inputRef, startTask, cancelTask, handleConfirm, status };
+  const handleInputSubmit = (values: { [key: string]: string }) => {
+    if (socket) {
+      socket.send(JSON.stringify({ type: "user_input", values: values }));
+    }
+    // Clear user input requests after handling
+    clearUserInputRequests?.(chatRoomId);
+  };
+
+  return {
+    inputRef,
+    startTask,
+    cancelTask,
+    handleConfirm,
+    handleInputSubmit,
+    status,
+  };
 };

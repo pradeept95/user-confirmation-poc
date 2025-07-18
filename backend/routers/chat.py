@@ -13,6 +13,7 @@ from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.reasoning import ReasoningTools
 from agno.tools.mcp import MCPTools, MultiMCPTools
+from tool import get_user_input
 
 from config import create_azure_openai_model
 from task.task_manager import start_background_task, request_confirmation
@@ -213,8 +214,16 @@ async def agent_with_mcp_handler(session_id: str, user_query: str):
         ) as mcp_tools:
             agent = Agent(
                 model=create_azure_openai_model(),
+                instructions=[
+                    "Provide accurate and relevant information based on the user's query.", 
+                    "Always include the reference links in your response.",
+                    "If you need more information, ask the user for input.",
+                    f"Current session ID is {session_id}.",
+                    "if user needs to provide input, use the get_user_input tool.",
+                ],
                 tools=[
                     mcp_tools, 
+                    get_user_input,
                     ReasoningTools(
                         think=True,
                         analyze=True,

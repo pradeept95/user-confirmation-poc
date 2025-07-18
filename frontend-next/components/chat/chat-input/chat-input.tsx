@@ -5,22 +5,22 @@ import { Button } from "@/components/ui/button";
 import Icon from "@/components/icon";
 import { ResponseMode, useHandleChat } from "@/hook/use-handle-chat";
 import { useChatStore } from "@/store/chat-store";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
-import React from "react";
+import React, { useEffect } from "react";
 
 export const TaskConfirmationRequest = ({
+  chatRoomId,
   handleConfirm,
 }: {
+  chatRoomId: string;
   handleConfirm: (value: boolean) => void;
 }) => {
   const chatRooms = useChatStore((state) => state.chatRooms);
-  const confirmationRequests =
-    chatRooms?.find((room) => room.id === "temp_agent_id")
-      ?.confirmationRequests || [];
+  const confirmationRequests = chatRooms?.find(
+    (room) => room.id === chatRoomId
+  )?.confirmationRequests;
 
   if (!confirmationRequests || confirmationRequests.length === 0) {
-    return null;
+    return "No confirmation requests";
   }
 
   return (
@@ -49,18 +49,128 @@ export const TaskConfirmationRequest = ({
   );
 };
 
+type UserInputRequest = {
+  chatRoomId: string;
+  handleInputSubmit: (values: { [key: string]: string }) => void;
+};
+
+export const UserInputRequest: React.FC<UserInputRequest> = ({
+  chatRoomId,
+  handleInputSubmit,
+}) => {
+  const chatRooms = useChatStore((state) => state.chatRooms);
+  const userInputRequests = chatRooms?.find(
+    (room) => room.id === chatRoomId
+  )?.userInputRequests;
+
+  const [inputValues, setInputValues] = React.useState<{
+    [key: string]: string;
+  }>({});
+
+  // useEffect(() => {
+  //   setInputValues(
+  //     (userInputRequests || []).reduce((acc: any, field) => {
+  //       acc[field.name] = "";
+  //       return acc;
+  //     }, {})
+  //   );
+  // }, [userInputRequests]);
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    fieldName: string
+  ) => {
+    setInputValues((prev) => ({
+      ...prev,
+      [fieldName]: e.target.value,
+    }));
+  };
+
+  if (!userInputRequests || userInputRequests.length === 0) {
+    return "No user input requests";
+  }
+
+  return (
+    <div
+      style={{
+        background: "#e3f2fd",
+        border: "2px solid #2196F3",
+        borderRadius: "8px",
+        padding: 16,
+        margin: 16,
+      }}
+    >
+      <div style={{ fontWeight: "bold", marginBottom: 12, color: "#1565C0" }}>
+        📝 Agent Requires Input
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        Please provide the following information:
+      </div>
+      {userInputRequests.map((field) => (
+        <div key={field.name} style={{ margin: "12px 0" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "4px",
+              fontWeight: "500",
+              color: "#1565C0",
+            }}
+          >
+            {field.description}:
+          </label>
+          <input
+            type="text"
+            value={inputValues[field.name] || ""}
+            onChange={(e) => handleInputChange(e, field.name)}
+            style={{
+              width: "100%",
+              padding: "8px 12px",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+              fontSize: "14px",
+            }}
+            placeholder={`Enter ${field.description.toLowerCase()}...`}
+          />
+        </div>
+      ))}
+      <button
+        onClick={() => handleInputSubmit(inputValues)}
+        style={{
+          backgroundColor: "#2196F3",
+          marginTop: "12px",
+        }}
+      >
+        📤 Submit Information
+      </button>
+    </div>
+  );
+};
+
 type ChatInputProps = {
   chatRoomId: string;
   mode: ResponseMode;
 };
 
 const ChatInput: React.FC<ChatInputProps> = ({ chatRoomId, mode }) => {
-  const { inputRef, startTask, cancelTask, handleConfirm, status } =
-    useHandleChat(chatRoomId, mode);
+  const {
+    inputRef,
+    startTask,
+    cancelTask,
+    handleConfirm,
+    handleInputSubmit,
+    status,
+  } = useHandleChat(chatRoomId, mode);
 
   return (
     <div className="flex flex-col relative mx-auto mb-1 w-full max-w-2xl items-end justify-center gap-x-2 font-geist">
-      <TaskConfirmationRequest handleConfirm={handleConfirm} />
+      <TaskConfirmationRequest
+        chatRoomId={chatRoomId}
+        handleConfirm={handleConfirm}
+      />
+      <UserInputRequest
+        chatRoomId={chatRoomId}
+        handleInputSubmit={handleInputSubmit}
+      />
       <div className="flex w-full border border-accent bg-primaryAccent  text-sm text-primary focus-within:border-accent">
         <Textarea
           placeholder={"Ask anything"}
