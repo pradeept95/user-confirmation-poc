@@ -219,7 +219,7 @@ async def agent_with_mcp_handler(session_id: str, user_query: str):
                     "Always include the reference links in your response.",
                     "If you need more information, ask the user for input.",
                     f"Current session ID is {session_id}.",
-                    "if user needs to provide input, use the get_user_input tool.",
+                    "if you need information from user, please use the get_user_input tool.",
                 ],
                 tools=[
                     mcp_tools, 
