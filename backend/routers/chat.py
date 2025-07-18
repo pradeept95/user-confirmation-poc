@@ -220,6 +220,7 @@ async def agent_with_mcp_handler(session_id: str, user_query: str):
                     "If you need more information, ask the user for input.",
                     f"Current session ID is {session_id}.",
                     "if you need information from user, please use the get_user_input tool.",
+                    "If you need to find information that will change over time, use the google_search tool.",
                 ],
                 tools=[
                     mcp_tools, 
@@ -233,6 +234,7 @@ async def agent_with_mcp_handler(session_id: str, user_query: str):
                     GoogleSearchTools(requires_confirmation_tools=["google_search"]), 
                 ],
                 markdown=True,
+                add_datetime_to_instructions=True,
             )
 
             response_stream: AsyncIterator[RunResponseEvent] = await agent.arun(
