@@ -17,3 +17,6 @@ pdfminer.six
 pymupdf4llm
 pdfplumber
 markdownify
+
+azure-identity
+azure-keyvault-secrets
