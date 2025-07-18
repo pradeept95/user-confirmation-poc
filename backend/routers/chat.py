@@ -1,4 +1,5 @@
 import asyncio
+from typing import AsyncIterator
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
 from models.types import StartTaskRequest
@@ -11,6 +12,7 @@ from agno.agent import RunResponseEvent
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.reasoning import ReasoningTools
+from agno.tools.mcp import MCPTools, MultiMCPTools
 
 from config import create_azure_openai_model
 from task.task_manager import start_background_task, request_confirmation
@@ -174,6 +176,111 @@ async def agent_handler(session_id: str, user_query: str):
         # Only cleanup if task still exists (might have been cleaned up by cancel endpoint)
         if session_manager.get_task(session_id):
             session_manager.cleanup_session(session_id)
+
+async def agent_with_mcp_handler(session_id: str, user_query: str):
+    print(f"FROM ARGS: Starting simulated chat completion for session {session_id} with query: {user_query}")
+    task = session_manager.get_task(session_id)
+    if not task:
+        print(f"No task found for session {session_id}")
+        return
+        
+    # Wait for WebSocket to be ready if not called from wait_for_connection_and_start_task
+    if not task.task_started.is_set():
+        try:
+            await asyncio.wait_for(task.websocket_ready.wait(), timeout=10.0) 
+        except asyncio.TimeoutError:
+            print(f"Timeout waiting for WebSocket for session {session_id}")
+            return
+    
+    try:
+        # Check if task was cancelled before starting
+        if task.cancel_event.is_set():
+            print(f"Task {session_id} was cancelled before starting")
+            await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+            return
+
+        # response start 
+        user_query = task.user_query
+        await ws_manager.send_json(session_id, {
+            "type": "task_started", 
+            "content": f"Starting AI task with query: '{user_query}'"
+        }, save_state=True)
+
+
+        async with MultiMCPTools(
+            urls=["http://localhost:8001/sse", "http://localhost:8002/sse", "http://localhost:8003/sse"],
+            urls_transports=["sse", "sse", "sse"],
+        ) as mcp_tools:
+            agent = Agent(
+                model=create_azure_openai_model(),
+                tools=[mcp_tools],
+                markdown=True,
+            )
+
+            response_stream: AsyncIterator[RunResponseEvent] = await agent.arun(
+                user_query,
+                stream=True,
+                stream_intermediate_steps=True
+            )
+            
+            async for run_response in response_stream:
+                # Check for cancellation at the start of each iteration
+                if task.cancel_event.is_set(): 
+                    print(f"Task {session_id} cancelled during agent run")
+                    await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+                    return
+                # Handle paused states (confirmations, user input, etc.)
+                if run_response.is_paused:
+                    print(f"Task {session_id} is paused")
+                    await ws_manager.send_json(session_id, {"type": "task_paused", "content": "Task is paused, waiting for user input."}, save_state=True)
+                    return
+                
+                # check if run_response is RunResponseEvent event type
+                if isinstance(run_response, RunResponseEvent):
+                    print(f"RunResponseEvent received: {run_response.content}")
+                    if run_response.content is not None:
+                        # Check for cancellation before sending
+                        if task.cancel_event.is_set():
+                            print(f"Task {session_id} was cancelled during streaming")
+                            await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+                            return
+                        chunk_dist = run_response.to_dict()
+                        await ws_manager.send_json(session_id, {"type": "task_progress", "data": chunk_dist}, save_state=True)
+                else:
+                    # Stream the response
+                    for chunk in run_response:
+                        # Check for cancellation before each chunk
+                        if task.cancel_event.is_set():
+                            print(f"Task {session_id} was cancelled during chunk streaming")
+                            await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+                            return
+                        if chunk.content is not None:
+                            chunk_dist = chunk.to_dict()
+                            await ws_manager.send_json(session_id, {"type": "task_progress", "data": chunk_dist}, save_state=True)
+            # Final check before completion
+            if task.cancel_event.is_set():
+                await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+                return
+            await ws_manager.send_json(session_id, {
+                "type": "task_completed", 
+                "content": f"AI task completed for query: '{user_query}'"
+            }, save_state=True)
+
+    except asyncio.CancelledError:
+        print(f"Task {session_id} was cancelled during processing")
+        await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+        raise  # Re-raise to properly handle cancellation
+    except Exception as e:
+        print(f"Error during chat completion for {session_id}: {e}")
+        # Check if it was a cancellation that caused the error
+        if task.cancel_event.is_set():
+            await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+        else:
+            await ws_manager.send_json(session_id, {"type": "task_failed", "error": str(e)}, save_state=True)
+            raise
+    finally:
+        task.cancel_event.set()
+        
 
 async def team_handler(session_id: str, user_query: str):
     print(f"FROM ARGS: Starting simulated chat completion for session {session_id} with query: {user_query}")
@@ -354,6 +461,7 @@ async def start_task(request: StartTaskRequest, background_tasks: BackgroundTask
         "agent": agent_handler,
         "team": team_handler,
         "workflow": workflow_handler,
+        "agent_with_mcp": agent_with_mcp_handler,
     }
     callback_handler = handler_map.get(handler_name)
     if not callback_handler:
