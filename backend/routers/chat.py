@@ -213,7 +213,16 @@ async def agent_with_mcp_handler(session_id: str, user_query: str):
         ) as mcp_tools:
             agent = Agent(
                 model=create_azure_openai_model(),
-                tools=[mcp_tools],
+                tools=[
+                    mcp_tools, 
+                    ReasoningTools(
+                        think=True,
+                        analyze=True,
+                        add_instructions=True,
+                        add_few_shot=True,
+                    ),
+                    GoogleSearchTools(requires_confirmation_tools=["google_search"]), 
+                ],
                 markdown=True,
             )
 
@@ -233,7 +242,35 @@ async def agent_with_mcp_handler(session_id: str, user_query: str):
                 if run_response.is_paused:
                     print(f"Task {session_id} is paused")
                     await ws_manager.send_json(session_id, {"type": "task_paused", "content": "Task is paused, waiting for user input."}, save_state=True)
-                    return
+                    
+                    for tool in agent.run_response.tools_requiring_confirmation:
+                        # Check for cancellation before requesting confirmation
+                        if task.cancel_event.is_set():
+                            print(f"Task {session_id} cancelled during confirmation request")
+                            await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+                            return
+                        
+                        print(f"Tool name [bold blue]{tool.tool_name}({tool.tool_args})[/] requires confirmation.")
+                        confirmation_message = (
+                            f"Agent is trying to access {tool.tool_name} with query {tool.tool_args}. Do you want to proceed?"
+                        )
+                        await request_confirmation(session_id, confirmation_message)
+
+                        # Check for cancellation after confirmation request
+                        if task.cancel_event.is_set():
+                            print(f"Task {session_id} cancelled during confirmation wait")
+                            await ws_manager.send_json(session_id, {"type": "task_cancelled", "content": "Task cancelled by user."}, save_state=True)
+                            return
+
+                        if not task.confirmed:
+                            print(f"User did not confirm tool {tool.tool_name}, setting confirmed to False")
+                            tool.confirmed = False
+                        else:
+                            print(f"User confirmed tool {tool.tool_name}, setting confirmed to True")
+                            tool.confirmed = True
+
+                    # continue the run after confirmation
+                    run_response = agent.continue_run(stream=True, stream_intermediate_steps=True)
                 
                 # check if run_response is RunResponseEvent event type
                 if isinstance(run_response, RunResponseEvent):
