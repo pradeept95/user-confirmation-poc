@@ -209,7 +209,7 @@ async def agent_with_mcp_handler(session_id: str, user_query: str):
 
 
         async with MultiMCPTools(
-            urls=["http://localhost:8001/sse", "http://localhost:8002/sse", "http://localhost:8003/sse"],
+            urls=["http://localhost:9001/sse", "http://localhost:9002/sse", "http://localhost:9003/sse"],
             urls_transports=["sse", "sse", "sse"],
         ) as mcp_tools:
             agent = Agent(
@@ -284,8 +284,7 @@ async def agent_with_mcp_handler(session_id: str, user_query: str):
                     run_response = agent.continue_run(stream=True, stream_intermediate_steps=True)
                 
                 # check if run_response is RunResponseEvent event type
-                if isinstance(run_response, RunResponseEvent):
-                    print(f"RunResponseEvent received: {run_response.content}")
+                if isinstance(run_response, RunResponseEvent): 
                     if run_response.content is not None:
                         # Check for cancellation before sending
                         if task.cancel_event.is_set():
