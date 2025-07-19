@@ -209,8 +209,8 @@ async def agent_with_mcp_handler(session_id: str, user_query: str):
 
 
         async with MultiMCPTools(
-            urls=["http://localhost:9001/sse", "http://localhost:9002/sse", "http://localhost:9003/sse"],
-            urls_transports=["sse", "sse", "sse"],
+            urls=["http://localhost:9001/sse", "http://localhost:9002/sse"],
+            urls_transports=["sse", "sse"],
         ) as mcp_tools:
             agent = Agent(
                 model=create_azure_openai_model(),

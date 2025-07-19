@@ -1,5 +1,22 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+import { persist, StateStorage, createJSONStorage } from "zustand/middleware";
+import { get, set, del } from "idb-keyval";
+
+// Custom storage object
+export const storage: StateStorage = {
+  getItem: async (name: string): Promise<any> => {
+    console.log(name, "has been retrieved");
+    return (await get(name)) || null;
+  },
+  setItem: async (name: string, value: any): Promise<void> => {
+    console.log(name, "with value", value, "has been saved");
+    await set(name, value);
+  },
+  removeItem: async (name: string): Promise<void> => {
+    console.log(name, "has been deleted");
+    await del(name);
+  },
+};
 
 export interface ToolCall {
   role: "user" | "tool" | "system" | "assistant";
@@ -250,7 +267,8 @@ export const useChatStore = create<ChatStore>()(
     }),
 
     {
-      name: "chat-storage",
+      name: "chat-storage", 
+      storage: createJSONStorage(() => storage), 
     }
   )
 );
